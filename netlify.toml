@@ -1,8 +1,36 @@
 [build]
   publish = "build/web"
-  command = "flutter build web --release"
+  command = "bash netlify_build.sh"
 
+[build.environment]
+  FLUTTER_BRANCH = "stable"
+
+# Single Page App (SPA) redirect for GoRouter navigation
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Security & Cache Control Headers
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+
+# Cache static assets for fast subsequent loads
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# Never cache entrypoint JS files to ensure latest deployment is always served
+[[headers]]
+  for = "/flutter_bootstrap.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/main.dart.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
