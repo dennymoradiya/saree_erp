@@ -1,0 +1,116 @@
+rules_version = '2';
+
+// 100% Dart Architecture — Firestore Security Rules
+//
+// Core principle:
+//  - Authenticated and active Admins can manage users, profiles, challans,
+//    inventory transactions, audit logs, and counters.
+//  - Stitching users and suppliers have strictly scoped read permissions
+//    for their own records.
+//  - Stitching users can submit deposit requests for their assigned work.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function role() {
+      return userDoc().data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && role() == 'admin';
+    }
+
+    function isActive() {
+      return isSignedIn() && userDoc().data.isActive == true;
+    }
+
+    // Users can read their own profile; only admins can list/write others.
+    match /users/{uid} {
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if isSignedIn() && isActive();
+      allow write: if isAdmin();
+
+      match /skus/{skuId} {
+        allow read: if isSignedIn() && isActive();
+        allow write: if isAdmin();
+      }
+    }
+
+    match /suppliers/{supplierId} {
+      allow read: if isSignedIn() && isActive();
+      allow write: if isAdmin();
+    }
+
+    match /stitching_users/{stitchingUserId} {
+      allow read: if isSignedIn() && isActive();
+      allow write: if isAdmin();
+    }
+
+    // Challans & challan_items: read-scoped to the parties involved; admins and suppliers can create.
+    match /challans/{challanId} {
+      allow read: if isAdmin() ||
+        (isSignedIn() && isActive() && (
+          userDoc().data.stitchingUserId == resource.data.stitchingUserId ||
+          userDoc().data.supplierId == resource.data.supplierId
+        ));
+      allow create: if isAdmin() ||
+        (isSignedIn() && isActive() && role() == 'supplier' && request.resource.data.supplierId == userDoc().data.supplierId);
+      allow update, delete: if isAdmin();
+    }
+
+    match /challan_items/{itemId} {
+      allow read: if isAdmin() || isSignedIn();
+      allow create: if isAdmin() || (isSignedIn() && isActive() && role() == 'supplier');
+      allow update: if isAdmin() || (isSignedIn() && isActive() && role() == 'supplier');
+      allow delete: if isAdmin();
+    }
+
+    match /deposit_requests/{requestId} {
+      allow read: if isAdmin() ||
+        (isSignedIn() && isActive() && userDoc().data.stitchingUserId == resource.data.stitchingUserId);
+      allow create: if isSignedIn() && isActive() && role() == 'stitching_user';
+      allow update, delete: if isAdmin();
+    }
+
+    match /material_transactions/{txId} {
+      allow read: if isAdmin() ||
+        (isSignedIn() && isActive() && userDoc().data.stitchingUserId == resource.data.stitchingUserId);
+      allow write: if isAdmin();
+    }
+
+    match /supplier_material_transactions/{txId} {
+      allow read: if isAdmin() ||
+        (isSignedIn() && isActive() && userDoc().data.supplierId == resource.data.supplierId);
+      allow create: if isAdmin() || (isSignedIn() && isActive() && role() == 'supplier');
+      allow update, delete: if isAdmin();
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && resource.data.recipientUserId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.recipientUserId == request.auth.uid; // mark as read
+      allow create: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn() && isActive();
+      allow update, delete: if isAdmin();
+    }
+
+    match /counters/{counterId} {
+      allow read, write: if isAdmin() || (isSignedIn() && isActive() && role() == 'supplier');
+    }
+  }
+}

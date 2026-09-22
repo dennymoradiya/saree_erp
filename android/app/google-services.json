@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1054198674055",
+    "project_id": "saree-sutra",
+    "storage_bucket": "saree-sutra.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1054198674055:android:cb15bcf29b0de84bd3be22",
+        "android_client_info": {
+          "package_name": "com.sareesutra.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCI-C4Mb6DC8uHQ__Xl4gr0wHO-i9anXSE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
