@@ -12,15 +12,18 @@ abstract class RoutePaths {
   static const String adminDepositRequests = '/admin/deposit-requests';
   static const String adminSupplierLedger = '/admin/supplier-ledger';
   static const String adminStitchingLedger = '/admin/stitching-ledger';
+  static const String adminPendingReturnsLedger = '/admin/pending-returns-ledger';
 
   static const String stitchingDashboard = '/stitching';
   static const String stitchingChallans = '/stitching/challans';
   static const String stitchingCreateDepositRequest = '/stitching/deposit-requests/create';
   static const String stitchingLedger = '/stitching/ledger';
+  static const String stitchingPendingReturnsLedger = '/stitching/pending-returns-ledger';
 
   static const String supplierDashboard = '/supplier';
   static const String supplierChallans = '/supplier/challans';
   static const String supplierCreateChallan = '/supplier/challans/create';
   static const String supplierLedger = '/supplier/ledger';
+  static const String supplierPendingMaterials = '/supplier/pending-materials';
 }
 

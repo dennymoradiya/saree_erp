@@ -760,7 +760,7 @@ class _ChallanItemCardState extends ConsumerState<_ChallanItemCard> {
                   hintText: 'e.g. 100',
                   prefixIcon: Icon(Icons.tag),
                 ),
-                onChanged: _onSareeQuantityChanged,
+                // onChanged: _onSareeQuantityChanged,
                 validator: (v) {
                   final n = double.tryParse(v ?? '');
                   if (n == null || n <= 0) {

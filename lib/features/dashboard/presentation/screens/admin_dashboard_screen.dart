@@ -15,6 +15,31 @@ import 'package:saree_sutra/features/users/presentation/controllers/users_provid
 class AdminDashboardScreen extends ConsumerWidget {
   const AdminDashboardScreen({super.key});
 
+  void _showLogoutDialog(BuildContext context, WidgetRef ref) {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Logout'),
+          content: const Text('Are you sure you want to logout?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                ref.read(authControllerProvider.notifier).signOut();
+              },
+              child: const Text('Logout'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
@@ -78,8 +103,7 @@ class AdminDashboardScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Logout',
-            onPressed: () =>
-                ref.read(authControllerProvider.notifier).signOut(),
+            onPressed: () => _showLogoutDialog(context, ref),
           ),
         ],
       ),
@@ -128,52 +152,70 @@ class AdminDashboardScreen extends ConsumerWidget {
               ],
 
               // Primary Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(56),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () =>
+                          context.push(RoutePaths.adminCreateChallan),
+                      icon: const Icon(Icons.add_shopping_cart, size: 22),
+                      label: const Text(
+                        'Create Challan',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton.icon(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF0F766E),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(56),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 18,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () => showManualReturnDialog(context),
+                      icon: const Icon(Icons.assignment_return_outlined, size: 22),
+                      label: const Text(
+                        'Manual Return',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
               Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 14,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: () =>
-                        context.push(RoutePaths.adminCreateChallan),
-                    icon: const Icon(Icons.add_shopping_cart, size: 20),
-                    label: const Text(
-                      'Create Challan',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  FilledButton.icon(
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F766E),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 14,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                    ),
-                    onPressed: () => showManualReturnDialog(context),
-                    icon: const Icon(Icons.assignment_return_outlined, size: 20),
-                    label: const Text(
-                      'Manual Return (Deposit)',
-                      style: TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
                   FilledButton.tonalIcon(
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 14,
+                        horizontal: 18,
+                        vertical: 12,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -181,7 +223,7 @@ class AdminDashboardScreen extends ConsumerWidget {
                     ),
                     onPressed: () =>
                         context.push(RoutePaths.adminDepositRequests),
-                    icon: const Icon(Icons.assignment_turned_in, size: 20),
+                    icon: const Icon(Icons.assignment_turned_in, size: 18),
                     label: Text(
                       pendingRequestsCount > 0
                           ? 'Deposit / Return ($pendingRequestsCount Pending)'
@@ -192,15 +234,15 @@ class AdminDashboardScreen extends ConsumerWidget {
                   OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 14,
+                        horizontal: 18,
+                        vertical: 12,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                     onPressed: () => context.push(RoutePaths.adminChallans),
-                    icon: const Icon(Icons.receipt_long, size: 20),
+                    icon: const Icon(Icons.receipt_long, size: 18),
                     label: const Text(
                       'View All Challans',
                       style: TextStyle(fontWeight: FontWeight.bold),
@@ -211,15 +253,15 @@ class AdminDashboardScreen extends ConsumerWidget {
                       backgroundColor: Colors.amber.shade100,
                       foregroundColor: Colors.brown.shade900,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 14,
+                        horizontal: 16,
+                        vertical: 12,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                     onPressed: () => context.push(RoutePaths.adminSupplierLedger),
-                    icon: const Icon(Icons.inventory_2_outlined, size: 20),
+                    icon: const Icon(Icons.inventory_2_outlined, size: 18),
                     label: const Text(
                       'Supplier Ledger',
                       style: TextStyle(fontWeight: FontWeight.bold),
@@ -230,17 +272,36 @@ class AdminDashboardScreen extends ConsumerWidget {
                       backgroundColor: Colors.green.shade100,
                       foregroundColor: Colors.green.shade900,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 18,
-                        vertical: 14,
+                        horizontal: 16,
+                        vertical: 12,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                     onPressed: () => context.push(RoutePaths.adminStitchingLedger),
-                    icon: const Icon(Icons.fact_check_outlined, size: 20),
+                    icon: const Icon(Icons.fact_check_outlined, size: 18),
                     label: const Text(
                       'Stitching Returns Ledger',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  FilledButton.tonalIcon(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.purple.shade100,
+                      foregroundColor: Colors.purple.shade900,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () => context.push(RoutePaths.adminPendingReturnsLedger),
+                    icon: const Icon(Icons.pending_actions_outlined, size: 18),
+                    label: const Text(
+                      'Pending Returns Ledger',
                       style: TextStyle(fontWeight: FontWeight.bold),
                     ),
                   ),
@@ -332,40 +393,77 @@ class AdminDashboardScreen extends ConsumerWidget {
                               ),
                             ],
                           ),
-                          TextButton(
-                            onPressed: () =>
-                                context.push(RoutePaths.adminChallans),
-                            child: const Text('View Challans'),
+                          Row(
+                            children: [
+                              TextButton.icon(
+                                onPressed: () => context
+                                    .push(RoutePaths.adminPendingReturnsLedger),
+                                icon: const Icon(Icons.analytics_outlined,
+                                    size: 16,),
+                                label: const Text('View Ledger'),
+                              ),
+                              const SizedBox(width: 8),
+                              TextButton(
+                                onPressed: () =>
+                                    context.push(RoutePaths.adminChallans),
+                                child: const Text('View Challans'),
+                              ),
+                            ],
                           ),
                         ],
                       ),
                       const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade200),
-                        ),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            const Text(
-                              'Total Sarees Return:',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w600,
+                      InkWell(
+                        onTap: () => context
+                            .push(RoutePaths.adminPendingReturnsLedger),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.shade50,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.blue.shade200),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Total Sarees Return:',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Tap to view user-wise & product-wise ledger',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.blue.shade800,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ),
-                            Text(
-                              '${totalStitchingPending.toInt()} pic',
-                              style: const TextStyle(
-                                fontSize: 20,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue,
+                              Row(
+                                children: [
+                                  Text(
+                                    '${totalStitchingPending.toInt()} pic',
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.blue,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.arrow_forward_ios,
+                                      size: 14, color: Colors.blue,),
+                                ],
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ],

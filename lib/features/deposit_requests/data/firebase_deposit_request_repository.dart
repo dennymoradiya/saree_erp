@@ -71,11 +71,13 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
         'stitchingUserId': stitchingUserId,
         'status': DepositRequestStatus.pending.value,
         'items': items
-            .map((i) => {
-                  'productId': i.productId,
-                  'sku': i.sku,
-                  'requestedQuantity': i.requestedQuantity,
-                },)
+            .map(
+              (i) => {
+                'productId': i.productId,
+                'sku': i.sku,
+                'requestedQuantity': i.requestedQuantity,
+              },
+            )
             .toList(),
         'notes': notes?.trim(),
         'submittedAt': now,
@@ -106,15 +108,18 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
           .collection(FirestorePaths.depositRequests)
           .where('stitchingUserId', isEqualTo: stitchingUserId)
           .where('status', isEqualTo: DepositRequestStatus.pending.value)
-          .where('submittedAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
+          .where('submittedAt',
+              isGreaterThanOrEqualTo: Timestamp.fromDate(startOfToday))
           .get();
 
       final hasMatch = snap.docs.any((d) {
         final items = d.data()['items'] as List<dynamic>? ?? [];
-        return items.any((item) =>
-            item is Map &&
-            item['productId'] == productId &&
-            item['sku'] == sku,);
+        return items.any(
+          (item) =>
+              item is Map &&
+              item['productId'] == productId &&
+              item['sku'] == sku,
+        );
       });
 
       return Success(hasMatch);
@@ -142,14 +147,16 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
       final requestData = reqDoc.data()!;
       if (requestData['status'] != DepositRequestStatus.pending.value) {
         return const Failure(
-          DuplicateOperationException('This deposit request is not in PENDING status.'),
+          DuplicateOperationException(
+              'This deposit request is not in PENDING status.'),
         );
       }
 
       final stitchingUserId = requestData['stitchingUserId'] as String;
       final rawItems = requestData['items'] as List<dynamic>? ?? [];
       final items = rawItems
-          .map((e) => DepositRequestItem.fromJson(Map<String, dynamic>.from(e as Map)))
+          .map((e) =>
+              DepositRequestItem.fromJson(Map<String, dynamic>.from(e as Map)))
           .toList();
 
       final returnOps = await _prepareStitchingReturnOperations(
@@ -407,7 +414,8 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
         .get();
 
     final activeChallans = userChallansSnap.docs
-        .where((d) => (d.data()['status'] as String?) != ChallanStatus.cancelled.value)
+        .where((d) =>
+            (d.data()['status'] as String?) != ChallanStatus.cancelled.value)
         .toList();
 
     final userChallanIds = activeChallans.map((d) => d.id).toSet();
@@ -417,7 +425,8 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
       );
     }
 
-    final challanItemUpdates = <DocumentReference<Map<String, dynamic>>, Map<String, dynamic>>{};
+    final challanItemUpdates =
+        <DocumentReference<Map<String, dynamic>>, Map<String, dynamic>>{};
     final materialTransactions = <Map<String, dynamic>>[];
     final createdTxIds = <String>[];
     final modifiedChallanIds = <String>{};
@@ -482,9 +491,8 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
 
         modifiedChallanIds.add(alloc.challanId);
 
-        final txRef = _firestore
-            .collection(FirestorePaths.materialTransactions)
-            .doc();
+        final txRef =
+            _firestore.collection(FirestorePaths.materialTransactions).doc();
         materialTransactions.add({
           'ref': txRef,
           'data': {
@@ -571,4 +579,3 @@ class _StitchingReturnOps {
       challanHeaderUpdates;
   final List<String> createdTxIds;
 }
-

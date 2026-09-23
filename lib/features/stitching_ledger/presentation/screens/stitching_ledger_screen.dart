@@ -16,7 +16,8 @@ class StitchingLedgerScreen extends ConsumerStatefulWidget {
   final String? initialStitchingUserId;
 
   @override
-  ConsumerState<StitchingLedgerScreen> createState() => _StitchingLedgerScreenState();
+  ConsumerState<StitchingLedgerScreen> createState() =>
+      _StitchingLedgerScreenState();
 }
 
 class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
@@ -26,17 +27,34 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
   void initState() {
     super.initState();
     final authUser = ref.read(authStateChangesProvider).value;
+    final isAdmin = authUser?.role == UserRole.admin;
     if (authUser?.role == UserRole.stitchingUser) {
       _effectiveStitchingUserId = authUser?.stitchingUserId;
     } else {
       _effectiveStitchingUserId = widget.initialStitchingUserId;
     }
+
+    if (!isAdmin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final currentFilter = ref
+            .read(stitchingLedgerFilterProvider(_effectiveStitchingUserId))
+            .dateFilter;
+        if (currentFilter == LedgerDateFilter.allTime) {
+          ref
+              .read(stitchingLedgerFilterProvider(_effectiveStitchingUserId).notifier)
+              .setDateFilter(LedgerDateFilter.thisMonth);
+        }
+      });
+    }
   }
 
   Future<void> _selectCustomDateRange(BuildContext context) async {
-    final filterState = ref.read(stitchingLedgerFilterProvider(_effectiveStitchingUserId));
+    final filterState =
+        ref.read(stitchingLedgerFilterProvider(_effectiveStitchingUserId));
     final initialRange = DateTimeRange(
-      start: filterState.customStartDate ?? DateTime.now().subtract(const Duration(days: 7)),
+      start: filterState.customStartDate ??
+          DateTime.now().subtract(const Duration(days: 7)),
       end: filterState.customEndDate ?? DateTime.now(),
     );
 
@@ -49,7 +67,10 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
     );
 
     if (picked != null) {
-      ref.read(stitchingLedgerFilterProvider(_effectiveStitchingUserId).notifier).setDateFilter(
+      ref
+          .read(
+              stitchingLedgerFilterProvider(_effectiveStitchingUserId).notifier)
+          .setDateFilter(
             LedgerDateFilter.custom,
             customStart: picked.start,
             customEnd: picked.end,
@@ -63,10 +84,13 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
     final authUser = ref.watch(authStateChangesProvider).value;
     final isAdmin = authUser?.role == UserRole.admin;
 
-    final filterState = ref.watch(stitchingLedgerFilterProvider(_effectiveStitchingUserId));
-    final filterNotifier = ref.read(stitchingLedgerFilterProvider(_effectiveStitchingUserId).notifier);
+    final filterState =
+        ref.watch(stitchingLedgerFilterProvider(_effectiveStitchingUserId));
+    final filterNotifier = ref.read(
+        stitchingLedgerFilterProvider(_effectiveStitchingUserId).notifier);
 
-    final ledgerAsync = ref.watch(dayWiseStitchingLedgerProvider(_effectiveStitchingUserId));
+    final ledgerAsync =
+        ref.watch(dayWiseStitchingLedgerProvider(_effectiveStitchingUserId));
     final usersAsync = ref.watch(stitchingUsersListProvider);
     final stitchingUsers = usersAsync.asData?.value ?? [];
 
@@ -103,7 +127,8 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
                 if (isAdmin) ...[
                   Row(
                     children: [
-                      const Icon(Icons.people_outline, size: 18, color: Colors.grey),
+                      const Icon(Icons.people_outline,
+                          size: 18, color: Colors.grey),
                       const SizedBox(width: 8),
                       Expanded(
                         child: DropdownButtonFormField<String?>(
@@ -111,7 +136,8 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
                           isDense: true,
                           decoration: const InputDecoration(
                             labelText: 'Filter by Stitching Unit',
-                            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            contentPadding: EdgeInsets.symmetric(
+                                horizontal: 12, vertical: 8),
                             border: OutlineInputBorder(),
                           ),
                           items: [
@@ -124,7 +150,8 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
                                   child: Text(u.name),
                                 )),
                           ],
-                          onChanged: (id) => filterNotifier.setStitchingUser(id),
+                          onChanged: (id) =>
+                              filterNotifier.setStitchingUser(id),
                         ),
                       ),
                     ],
@@ -136,7 +163,8 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: LedgerDateFilter.values.map((preset) {
+                    children: LedgerDateFilter.availableFilters(isAdmin: isAdmin)
+                        .map((preset) {
                       final isSelected = filterState.dateFilter == preset;
                       return Padding(
                         padding: const EdgeInsets.only(right: 6),
@@ -162,15 +190,18 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const Icon(Icons.info_outline, size: 14, color: Colors.grey),
+                      const Icon(Icons.info_outline,
+                          size: 14, color: Colors.grey),
                       const SizedBox(width: 6),
                       Text(
                         'Range: ${DateFormat('dd MMM yyyy').format(filterState.customStartDate!)} - ${DateFormat('dd MMM yyyy').format(filterState.customEndDate!)}',
-                        style: TextStyle(fontSize: 12, color: theme.colorScheme.primary),
+                        style: TextStyle(
+                            fontSize: 12, color: theme.colorScheme.primary),
                       ),
                       TextButton(
                         onPressed: () => _selectCustomDateRange(context),
-                        child: const Text('Change', style: TextStyle(fontSize: 12)),
+                        child: const Text('Change',
+                            style: TextStyle(fontSize: 12)),
                       ),
                     ],
                   ),
@@ -182,10 +213,12 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
           // Ledger Content
           Expanded(
             child: ledgerAsync.when(
-              loading: () => const LoadingView(message: 'Calculating production returns...'),
+              loading: () => const LoadingView(
+                  message: 'Calculating production returns...'),
               error: (err, _) => ErrorView(
                 message: err.toString(),
-                onRetry: () => ref.invalidate(dayWiseStitchingLedgerProvider(_effectiveStitchingUserId)),
+                onRetry: () => ref.invalidate(
+                    dayWiseStitchingLedgerProvider(_effectiveStitchingUserId)),
               ),
               data: (dayWiseLedgers) {
                 if (dayWiseLedgers.isEmpty) {
@@ -193,16 +226,19 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.assignment_turned_in_outlined, size: 56, color: Colors.grey.shade400),
+                        Icon(Icons.assignment_turned_in_outlined,
+                            size: 56, color: Colors.grey.shade400),
                         const SizedBox(height: 12),
                         const Text(
                           'No Production Returns Found',
-                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           'No return transactions match the selected date & unit filter.',
-                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                          style: TextStyle(
+                              color: Colors.grey.shade600, fontSize: 13),
                         ),
                       ],
                     ),
@@ -263,11 +299,13 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
                       children: [
                         Text(
                           'Day-Wise Production Returns',
-                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                          style: theme.textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         Text(
                           '${dayWiseLedgers.length} Active Days',
-                          style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                          style: TextStyle(
+                              fontSize: 12, color: Colors.grey.shade600),
                         ),
                       ],
                     ),
@@ -310,7 +348,8 @@ class _DayWiseStitchingCard extends StatelessWidget {
         initiallyExpanded: isToday,
         tilePadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
-          backgroundColor: isToday ? Colors.green.shade700 : Colors.grey.shade200,
+          backgroundColor:
+              isToday ? Colors.green.shade700 : Colors.grey.shade200,
           foregroundColor: isToday ? Colors.white : Colors.black87,
           child: Text(
             '${dayLedger.date.day}',
@@ -322,7 +361,8 @@ class _DayWiseStitchingCard extends StatelessWidget {
             Expanded(
               child: Text(
                 dateStr,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
             ),
             if (isToday)
@@ -388,7 +428,8 @@ class _DayWiseStitchingCard extends StatelessWidget {
           const Divider(height: 1),
           Container(
             padding: const EdgeInsets.all(12),
-            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.2),
+            color: theme.colorScheme.surfaceContainerHighest
+                .withValues(alpha: 0.2),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -419,7 +460,8 @@ class _DayWiseStitchingCard extends StatelessWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (context, idx) {
                     final dist = dayLedger.distributions[idx];
-                    final timeStr = DateFormat('hh:mm a').format(dist.timestamp);
+                    final timeStr =
+                        DateFormat('hh:mm a').format(dist.timestamp);
 
                     return Container(
                       padding: const EdgeInsets.all(10),
@@ -442,16 +484,20 @@ class _DayWiseStitchingCard extends StatelessWidget {
                                 ),
                                 borderRadius: BorderRadius.circular(6),
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 4),
                                   decoration: BoxDecoration(
                                     color: Colors.indigo.shade50,
                                     borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(color: Colors.indigo.shade300),
+                                    border: Border.all(
+                                        color: Colors.indigo.shade300),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      Icon(Icons.open_in_new, size: 13, color: Colors.indigo.shade900),
+                                      Icon(Icons.open_in_new,
+                                          size: 13,
+                                          color: Colors.indigo.shade900),
                                       const SizedBox(width: 4),
                                       Text(
                                         dist.challanNumber,
@@ -468,12 +514,12 @@ class _DayWiseStitchingCard extends StatelessWidget {
 
                               Text(
                                 timeStr,
-                                style: TextStyle(fontSize: 11, color: Colors.grey.shade600),
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey.shade600),
                               ),
                             ],
                           ),
                           const SizedBox(height: 6),
-
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -483,21 +529,27 @@ class _DayWiseStitchingCard extends StatelessWidget {
                                   children: [
                                     Text(
                                       '${dist.productName} (${dist.sku})',
-                                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 13),
                                     ),
                                     Text(
                                       'Unit: ${dist.stitchingUserName}',
-                                      style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                                      style: TextStyle(
+                                          fontSize: 11,
+                                          color: Colors.grey.shade700),
                                     ),
                                   ],
                                 ),
                               ),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 10, vertical: 4),
                                 decoration: BoxDecoration(
                                   color: Colors.green.shade50,
                                   borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(color: Colors.green.shade300),
+                                  border:
+                                      Border.all(color: Colors.green.shade300),
                                 ),
                                 child: Text(
                                   '+${dist.quantity.toInt()} Sarees Returned',
@@ -563,7 +615,8 @@ class _StitchingSummaryCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             value,
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold, color: color),
           ),
           Text(
             label,

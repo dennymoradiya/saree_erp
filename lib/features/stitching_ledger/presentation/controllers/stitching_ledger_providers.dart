@@ -29,7 +29,8 @@ class StitchingLedgerFilterState {
     DateTime? customEndDate,
   }) {
     return StitchingLedgerFilterState(
-      stitchingUserId: clearUser ? null : (stitchingUserId ?? this.stitchingUserId),
+      stitchingUserId:
+          clearUser ? null : (stitchingUserId ?? this.stitchingUserId),
       dateFilter: dateFilter ?? this.dateFilter,
       customStartDate: customStartDate ?? this.customStartDate,
       customEndDate: customEndDate ?? this.customEndDate,
@@ -45,28 +46,34 @@ class StitchingLedgerFilterState {
       case LedgerDateFilter.allTime:
         return true;
       case LedgerDateFilter.today:
-        return dt.isAfter(todayStart.subtract(const Duration(milliseconds: 1))) &&
+        return dt.isAfter(
+                todayStart.subtract(const Duration(milliseconds: 1))) &&
             dt.isBefore(todayEnd);
       case LedgerDateFilter.yesterday:
         final yStart = todayStart.subtract(const Duration(days: 1));
-        final yEnd = DateTime(yStart.year, yStart.month, yStart.day, 23, 59, 59, 999);
+        final yEnd =
+            DateTime(yStart.year, yStart.month, yStart.day, 23, 59, 59, 999);
         return dt.isAfter(yStart.subtract(const Duration(milliseconds: 1))) &&
             dt.isBefore(yEnd);
       case LedgerDateFilter.last7Days:
         final sevenDaysAgo = todayStart.subtract(const Duration(days: 6));
-        return dt.isAfter(sevenDaysAgo.subtract(const Duration(milliseconds: 1))) &&
+        return dt.isAfter(
+                sevenDaysAgo.subtract(const Duration(milliseconds: 1))) &&
             dt.isBefore(todayEnd);
       case LedgerDateFilter.thisMonth:
         final monthStart = DateTime(now.year, now.month, 1);
-        return dt.isAfter(monthStart.subtract(const Duration(milliseconds: 1))) &&
+        return dt.isAfter(
+                monthStart.subtract(const Duration(milliseconds: 1))) &&
             dt.isBefore(todayEnd);
       case LedgerDateFilter.custom:
         if (customStartDate != null) {
-          final s = DateTime(customStartDate!.year, customStartDate!.month, customStartDate!.day);
+          final s = DateTime(customStartDate!.year, customStartDate!.month,
+              customStartDate!.day);
           if (dt.isBefore(s)) return false;
         }
         if (customEndDate != null) {
-          final e = DateTime(customEndDate!.year, customEndDate!.month, customEndDate!.day, 23, 59, 59, 999);
+          final e = DateTime(customEndDate!.year, customEndDate!.month,
+              customEndDate!.day, 23, 59, 59, 999);
           if (dt.isAfter(e)) return false;
         }
         return true;
@@ -74,15 +81,18 @@ class StitchingLedgerFilterState {
   }
 }
 
-class StitchingLedgerFilterNotifier extends StateNotifier<StitchingLedgerFilterState> {
+class StitchingLedgerFilterNotifier
+    extends StateNotifier<StitchingLedgerFilterState> {
   StitchingLedgerFilterNotifier({String? initialStitchingUserId})
-      : super(StitchingLedgerFilterState(stitchingUserId: initialStitchingUserId));
+      : super(StitchingLedgerFilterState(
+            stitchingUserId: initialStitchingUserId));
 
   void setStitchingUser(String? userId) {
     state = state.copyWith(stitchingUserId: userId, clearUser: userId == null);
   }
 
-  void setDateFilter(LedgerDateFilter filter, {DateTime? customStart, DateTime? customEnd}) {
+  void setDateFilter(LedgerDateFilter filter,
+      {DateTime? customStart, DateTime? customEnd}) {
     state = state.copyWith(
       dateFilter: filter,
       customStartDate: customStart,
@@ -91,27 +101,33 @@ class StitchingLedgerFilterNotifier extends StateNotifier<StitchingLedgerFilterS
   }
 }
 
-final stitchingLedgerRepositoryProvider = Provider<StitchingLedgerRepository>((ref) {
+final stitchingLedgerRepositoryProvider =
+    Provider<StitchingLedgerRepository>((ref) {
   return FirebaseStitchingLedgerRepository();
 });
 
 final stitchingLedgerFilterProvider = StateNotifierProvider.family<
     StitchingLedgerFilterNotifier, StitchingLedgerFilterState, String?>(
-  (ref, initialUserId) => StitchingLedgerFilterNotifier(initialStitchingUserId: initialUserId),
+  (ref, initialUserId) =>
+      StitchingLedgerFilterNotifier(initialStitchingUserId: initialUserId),
 );
 
 final rawReturnTransactionsStreamProvider =
-    StreamProvider.family<List<MaterialTransaction>, String?>((ref, stitchingUserId) {
+    StreamProvider.family<List<MaterialTransaction>, String?>(
+        (ref, stitchingUserId) {
   final repo = ref.watch(stitchingLedgerRepositoryProvider);
   return repo.watchReturnTransactions(stitchingUserId: stitchingUserId);
 });
 
 /// Computes the day-wise aggregated stitching returns ledger with distribution details and challan backlinks.
 final dayWiseStitchingLedgerProvider =
-    Provider.family<AsyncValue<List<DayWiseStitchingLedger>>, String?>((ref, initialUserId) {
+    Provider.family<AsyncValue<List<DayWiseStitchingLedger>>, String?>(
+        (ref, initialUserId) {
   final filter = ref.watch(stitchingLedgerFilterProvider(initialUserId));
-  final txsAsync = ref.watch(rawReturnTransactionsStreamProvider(filter.stitchingUserId));
-  final challansAsync = ref.watch(challansStreamProvider(const ChallanFilter()));
+  final txsAsync =
+      ref.watch(rawReturnTransactionsStreamProvider(filter.stitchingUserId));
+  final challansAsync =
+      ref.watch(challansStreamProvider(const ChallanFilter()));
   final usersAsync = ref.watch(stitchingUsersListProvider);
   final productsAsync = ref.watch(productsStreamProvider);
 
@@ -133,14 +149,16 @@ final dayWiseStitchingLedgerProvider =
   final productMap = {for (final p in products) p.productId: p.name};
 
   // 1. Filter by date
-  final filteredTxs = transactions.where((tx) => filter.matchesDate(tx.createdAt)).toList();
+  final filteredTxs =
+      transactions.where((tx) => filter.matchesDate(tx.createdAt)).toList();
 
   // 2. Group by date
   final Map<DateTime, List<StitchingDistributionItem>> dayGroups = {};
   final Map<DateTime, double> returnedTotals = {};
 
   for (final tx in filteredTxs) {
-    final dayKey = DateTime(tx.createdAt.year, tx.createdAt.month, tx.createdAt.day);
+    final dayKey =
+        DateTime(tx.createdAt.year, tx.createdAt.month, tx.createdAt.day);
 
     final challanNum = challanMap[tx.challanId] ?? tx.challanId;
     final uName = userMap[tx.stitchingUserId] ?? tx.stitchingUserId;
@@ -169,7 +187,8 @@ final dayWiseStitchingLedgerProvider =
   final sortedDays = dayGroups.keys.toList()..sort((a, b) => b.compareTo(a));
 
   final result = sortedDays.map((day) {
-    final dists = dayGroups[day]!..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final dists = dayGroups[day]!
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return DayWiseStitchingLedger(
       date: day,
       totalReturnedQuantity: returnedTotals[day] ?? 0,

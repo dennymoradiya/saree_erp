@@ -18,6 +18,17 @@ enum LedgerDateFilter {
 
   const LedgerDateFilter(this.displayName);
   final String displayName;
+
+  /// Returns available date filter options based on whether the user is an admin.
+  /// 'All Time' is only available for admin users.
+  static List<LedgerDateFilter> availableFilters({required bool isAdmin}) {
+    if (isAdmin) {
+      return LedgerDateFilter.values;
+    }
+    return LedgerDateFilter.values
+        .where((preset) => preset != LedgerDateFilter.allTime)
+        .toList();
+  }
 }
 
 class SupplierLedgerFilterState {
@@ -57,28 +68,34 @@ class SupplierLedgerFilterState {
       case LedgerDateFilter.allTime:
         return true;
       case LedgerDateFilter.today:
-        return dt.isAfter(todayStart.subtract(const Duration(milliseconds: 1))) &&
+        return dt.isAfter(
+                todayStart.subtract(const Duration(milliseconds: 1))) &&
             dt.isBefore(todayEnd);
       case LedgerDateFilter.yesterday:
         final yStart = todayStart.subtract(const Duration(days: 1));
-        final yEnd = DateTime(yStart.year, yStart.month, yStart.day, 23, 59, 59, 999);
+        final yEnd =
+            DateTime(yStart.year, yStart.month, yStart.day, 23, 59, 59, 999);
         return dt.isAfter(yStart.subtract(const Duration(milliseconds: 1))) &&
             dt.isBefore(yEnd);
       case LedgerDateFilter.last7Days:
         final sevenDaysAgo = todayStart.subtract(const Duration(days: 6));
-        return dt.isAfter(sevenDaysAgo.subtract(const Duration(milliseconds: 1))) &&
+        return dt.isAfter(
+                sevenDaysAgo.subtract(const Duration(milliseconds: 1))) &&
             dt.isBefore(todayEnd);
       case LedgerDateFilter.thisMonth:
         final monthStart = DateTime(now.year, now.month, 1);
-        return dt.isAfter(monthStart.subtract(const Duration(milliseconds: 1))) &&
+        return dt.isAfter(
+                monthStart.subtract(const Duration(milliseconds: 1))) &&
             dt.isBefore(todayEnd);
       case LedgerDateFilter.custom:
         if (customStartDate != null) {
-          final s = DateTime(customStartDate!.year, customStartDate!.month, customStartDate!.day);
+          final s = DateTime(customStartDate!.year, customStartDate!.month,
+              customStartDate!.day);
           if (dt.isBefore(s)) return false;
         }
         if (customEndDate != null) {
-          final e = DateTime(customEndDate!.year, customEndDate!.month, customEndDate!.day, 23, 59, 59, 999);
+          final e = DateTime(customEndDate!.year, customEndDate!.month,
+              customEndDate!.day, 23, 59, 59, 999);
           if (dt.isAfter(e)) return false;
         }
         return true;
@@ -86,15 +103,18 @@ class SupplierLedgerFilterState {
   }
 }
 
-class SupplierLedgerFilterNotifier extends StateNotifier<SupplierLedgerFilterState> {
+class SupplierLedgerFilterNotifier
+    extends StateNotifier<SupplierLedgerFilterState> {
   SupplierLedgerFilterNotifier({String? initialSupplierId})
       : super(SupplierLedgerFilterState(supplierId: initialSupplierId));
 
   void setSupplier(String? supplierId) {
-    state = state.copyWith(supplierId: supplierId, clearSupplier: supplierId == null);
+    state = state.copyWith(
+        supplierId: supplierId, clearSupplier: supplierId == null);
   }
 
-  void setDateFilter(LedgerDateFilter filter, {DateTime? customStart, DateTime? customEnd}) {
+  void setDateFilter(LedgerDateFilter filter,
+      {DateTime? customStart, DateTime? customEnd}) {
     state = state.copyWith(
       dateFilter: filter,
       customStartDate: customStart,
@@ -103,31 +123,39 @@ class SupplierLedgerFilterNotifier extends StateNotifier<SupplierLedgerFilterSta
   }
 }
 
-final supplierLedgerRepositoryProvider = Provider<SupplierLedgerRepository>((ref) {
+final supplierLedgerRepositoryProvider =
+    Provider<SupplierLedgerRepository>((ref) {
   return FirebaseSupplierLedgerRepository();
 });
 
-final supplierLedgerFilterProvider =
-    StateNotifierProvider.family<SupplierLedgerFilterNotifier, SupplierLedgerFilterState, String?>(
-  (ref, initialSupplierId) => SupplierLedgerFilterNotifier(initialSupplierId: initialSupplierId),
+final supplierLedgerFilterProvider = StateNotifierProvider.family<
+    SupplierLedgerFilterNotifier, SupplierLedgerFilterState, String?>(
+  (ref, initialSupplierId) =>
+      SupplierLedgerFilterNotifier(initialSupplierId: initialSupplierId),
 );
 
 final rawSupplierTransactionsStreamProvider =
-    StreamProvider.family<List<SupplierMaterialTransaction>, String?>((ref, supplierId) {
+    StreamProvider.family<List<SupplierMaterialTransaction>, String?>(
+        (ref, supplierId) {
   final repo = ref.watch(supplierLedgerRepositoryProvider);
   return repo.watchSupplierTransactions(supplierId: supplierId);
 });
 
 /// Computes the day-wise aggregated supplier ledger with distribution details and challan backlinks.
 final dayWiseSupplierLedgerProvider =
-    Provider.family<AsyncValue<List<DayWiseSupplierLedger>>, String?>((ref, initialSupplierId) {
+    Provider.family<AsyncValue<List<DayWiseSupplierLedger>>, String?>(
+        (ref, initialSupplierId) {
   final filter = ref.watch(supplierLedgerFilterProvider(initialSupplierId));
-  final txsAsync = ref.watch(rawSupplierTransactionsStreamProvider(filter.supplierId));
-  final challansAsync = ref.watch(challansStreamProvider(const ChallanFilter()));
+  final txsAsync =
+      ref.watch(rawSupplierTransactionsStreamProvider(filter.supplierId));
+  final challansAsync =
+      ref.watch(challansStreamProvider(const ChallanFilter()));
   final suppliersAsync = ref.watch(suppliersListProvider);
   final productsAsync = ref.watch(productsStreamProvider);
 
-  if (txsAsync.isLoading || challansAsync.isLoading || suppliersAsync.isLoading) {
+  if (txsAsync.isLoading ||
+      challansAsync.isLoading ||
+      suppliersAsync.isLoading) {
     return const AsyncLoading();
   }
 
@@ -145,7 +173,8 @@ final dayWiseSupplierLedgerProvider =
   final productMap = {for (final p in products) p.productId: p.name};
 
   // 1. Filter by date
-  final filteredTxs = transactions.where((tx) => filter.matchesDate(tx.createdAt)).toList();
+  final filteredTxs =
+      transactions.where((tx) => filter.matchesDate(tx.createdAt)).toList();
 
   // 2. Group by date (normalized to midnight)
   final Map<DateTime, List<SupplierDistributionItem>> dayGroups = {};
@@ -154,7 +183,8 @@ final dayWiseSupplierLedgerProvider =
   final Map<DateTime, double> blouseTotals = {};
 
   for (final tx in filteredTxs) {
-    final dayKey = DateTime(tx.createdAt.year, tx.createdAt.month, tx.createdAt.day);
+    final dayKey =
+        DateTime(tx.createdAt.year, tx.createdAt.month, tx.createdAt.day);
 
     final challanNum = challanMap[tx.challanId] ?? tx.challanId;
     final supName = supplierMap[tx.supplierId] ?? tx.supplierId;
@@ -192,7 +222,8 @@ final dayWiseSupplierLedgerProvider =
   final sortedDays = dayGroups.keys.toList()..sort((a, b) => b.compareTo(a));
 
   final result = sortedDays.map((day) {
-    final dists = dayGroups[day]!..sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    final dists = dayGroups[day]!
+      ..sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return DayWiseSupplierLedger(
       date: day,
       totalSaree: sareeTotals[day] ?? 0,

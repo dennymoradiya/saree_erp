@@ -11,7 +11,7 @@ class SareeErpApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
 
     return MaterialApp.router(
-      title: 'Saree ERP',
+      title: 'Saree Sutra',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light(),
       darkTheme: AppTheme.light(),

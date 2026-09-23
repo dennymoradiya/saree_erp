@@ -9,8 +9,8 @@ import 'package:saree_sutra/core/widgets/async_state_widgets.dart';
 import 'package:saree_sutra/features/challans/domain/challan.dart';
 import 'package:saree_sutra/features/challans/domain/challan_item.dart';
 import 'package:saree_sutra/features/challans/presentation/controllers/challan_providers.dart';
+import 'package:saree_sutra/features/challans/presentation/widgets/fulfill_supplier_material_dialog.dart';
 import 'package:saree_sutra/features/suppliers/presentation/controllers/suppliers_providers.dart';
-import 'package:saree_sutra/features/transactions/domain/material_transaction.dart';
 import 'package:saree_sutra/features/transactions/domain/supplier_material_transaction.dart';
 import 'package:saree_sutra/features/users/presentation/controllers/users_providers.dart';
 
@@ -19,7 +19,8 @@ class ChallanDetailScreen extends ConsumerWidget {
 
   final Challan challan;
 
-  void _showCancelDialog(BuildContext context, WidgetRef ref, Challan liveChallan) {
+  void _showCancelDialog(
+      BuildContext context, WidgetRef ref, Challan liveChallan) {
     final reasonCtrl = TextEditingController();
     showDialog(
       context: context,
@@ -85,10 +86,11 @@ class ChallanDetailScreen extends ConsumerWidget {
     );
   }
 
-  void _showFulfillDialog(BuildContext context, Challan liveChallan, ChallanItem item) {
+  void _showFulfillDialog(
+      BuildContext context, Challan liveChallan, ChallanItem item) {
     showDialog(
       context: context,
-      builder: (_) => _FulfillSupplierMaterialDialog(
+      builder: (_) => FulfillSupplierMaterialDialog(
         challan: liveChallan,
         item: item,
       ),
@@ -104,14 +106,16 @@ class ChallanDetailScreen extends ConsumerWidget {
     if (items.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Challan items are loading, please try again in a moment.'),
+          content:
+              Text('Challan items are loading, please try again in a moment.'),
         ),
       );
       return;
     }
 
     final suppliers = ref.read(suppliersListProvider).asData?.value ?? [];
-    final stitchingUsers = ref.read(stitchingUsersListProvider).asData?.value ?? [];
+    final stitchingUsers =
+        ref.read(stitchingUsersListProvider).asData?.value ?? [];
 
     var supplierName = liveChallan.supplierId;
     for (final s in suppliers) {
@@ -166,10 +170,13 @@ class ChallanDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final liveChallan =
-        ref.watch(challanStreamProvider(challan.challanId)).asData?.value ?? challan;
-    final itemsAsync = ref.watch(challanItemsStreamProvider(liveChallan.challanId));
+        ref.watch(challanStreamProvider(challan.challanId)).asData?.value ??
+            challan;
+    final itemsAsync =
+        ref.watch(challanItemsStreamProvider(liveChallan.challanId));
     final theme = Theme.of(context);
-    final dateStr = DateFormat('dd MMM yyyy, hh:mm a').format(liveChallan.createdAt);
+    final dateStr =
+        DateFormat('dd MMM yyyy, hh:mm a').format(liveChallan.createdAt);
 
     return Scaffold(
       appBar: AppBar(
@@ -229,7 +236,8 @@ class ChallanDetailScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 12),
                     Text('Date: $dateStr'),
-                    if (liveChallan.notes != null && liveChallan.notes!.isNotEmpty) ...[
+                    if (liveChallan.notes != null &&
+                        liveChallan.notes!.isNotEmpty) ...[
                       const SizedBox(height: 8),
                       Text('Notes: ${liveChallan.notes!}'),
                     ],
@@ -294,12 +302,14 @@ class ChallanDetailScreen extends ConsumerWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 16),
                   itemBuilder: (context, index) {
                     final item = items[index];
-                    final canFulfill = liveChallan.status != ChallanStatus.cancelled;
+                    final canFulfill =
+                        liveChallan.status != ChallanStatus.cancelled;
                     return _ChallanItemDetailCard(
                       item: item,
                       index: index,
                       canFulfill: canFulfill,
-                      onFulfill: () => _showFulfillDialog(context, liveChallan, item),
+                      onFulfill: () =>
+                          _showFulfillDialog(context, liveChallan, item),
                     );
                   },
                 );
@@ -413,7 +423,9 @@ class _ChallanItemDetailCard extends StatelessWidget {
                       _StatColumn(
                         label: 'Pending Production',
                         value: item.sareePendingQuantity.toInt().toString(),
-                        color: item.sareePendingQuantity > 0 ? Colors.red : Colors.green,
+                        color: item.sareePendingQuantity > 0
+                            ? Colors.red
+                            : Colors.green,
                       ),
                     ],
                   ),
@@ -435,7 +447,8 @@ class _ChallanItemDetailCard extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.inventory, size: 16, color: Colors.amber),
+                      const Icon(Icons.inventory,
+                          size: 16, color: Colors.amber),
                       const SizedBox(width: 6),
                       Text(
                         'B. SUPPLIER RAW-MATERIAL STATE (Components)',
@@ -486,18 +499,20 @@ class _ChallanItemDetailCard extends StatelessWidget {
                         item.sareeSuppliedQuantity,
                         item.sareePendingSupplierQuantity,
                       ),
-                      _buildMaterialTableRow(
-                        'Lace Pieces',
-                        item.laceRequiredQuantity,
-                        item.laceSuppliedQuantity,
-                        item.lacePendingSupplierQuantity,
-                      ),
-                      _buildMaterialTableRow(
-                        'Blouse Pieces',
-                        item.blouseRequiredQuantity,
-                        item.blouseSuppliedQuantity,
-                        item.blousePendingSupplierQuantity,
-                      ),
+                      if (item.laceRequiredQuantity > 0)
+                        _buildMaterialTableRow(
+                          'Lace Pieces',
+                          item.laceRequiredQuantity,
+                          item.laceSuppliedQuantity,
+                          item.lacePendingSupplierQuantity,
+                        ),
+                      if (item.blouseRequiredQuantity > 0)
+                        _buildMaterialTableRow(
+                          'Blouse Pieces',
+                          item.blouseRequiredQuantity,
+                          item.blouseSuppliedQuantity,
+                          item.blousePendingSupplierQuantity,
+                        ),
                     ],
                   ),
 
@@ -626,297 +641,6 @@ class _StatColumn extends StatelessWidget {
   }
 }
 
-/// Dialog allowing suppliers or admins to complete/supply remaining materials for a challan item.
-class _FulfillSupplierMaterialDialog extends ConsumerStatefulWidget {
-  const _FulfillSupplierMaterialDialog({
-    required this.challan,
-    required this.item,
-  });
-
-  final Challan challan;
-  final ChallanItem item;
-
-  @override
-  ConsumerState<_FulfillSupplierMaterialDialog> createState() =>
-      _FulfillSupplierMaterialDialogState();
-}
-
-class _FulfillSupplierMaterialDialogState
-    extends ConsumerState<_FulfillSupplierMaterialDialog> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _sareeCtrl;
-  late final TextEditingController _laceCtrl;
-  late final TextEditingController _blouseCtrl;
-  final _notesCtrl = TextEditingController();
-
-  bool _isSubmitting = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _sareeCtrl = TextEditingController(
-      text: widget.item.sareePendingSupplierQuantity > 0
-          ? widget.item.sareePendingSupplierQuantity.toInt().toString()
-          : '0',
-    );
-    _laceCtrl = TextEditingController(
-      text: widget.item.lacePendingSupplierQuantity > 0
-          ? widget.item.lacePendingSupplierQuantity.toInt().toString()
-          : '0',
-    );
-    _blouseCtrl = TextEditingController(
-      text: widget.item.blousePendingSupplierQuantity > 0
-          ? widget.item.blousePendingSupplierQuantity.toInt().toString()
-          : '0',
-    );
-  }
-
-  @override
-  void dispose() {
-    _sareeCtrl.dispose();
-    _laceCtrl.dispose();
-    _blouseCtrl.dispose();
-    _notesCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final sareeQty = double.tryParse(_sareeCtrl.text.trim()) ?? 0;
-    final laceQty = double.tryParse(_laceCtrl.text.trim()) ?? 0;
-    final blouseQty = double.tryParse(_blouseCtrl.text.trim()) ?? 0;
-
-    if (sareeQty <= 0 && laceQty <= 0 && blouseQty <= 0) {
-      setState(() {
-        _error = 'Please enter at least one quantity to supply.';
-      });
-      return;
-    }
-
-    if (sareeQty > widget.item.sareePendingSupplierQuantity) {
-      setState(() {
-        _error =
-            'Saree quantity cannot exceed pending balance of ${widget.item.sareePendingSupplierQuantity.toInt()}.';
-      });
-      return;
-    }
-    if (laceQty > widget.item.lacePendingSupplierQuantity) {
-      setState(() {
-        _error =
-            'Lace quantity cannot exceed pending balance of ${widget.item.lacePendingSupplierQuantity.toInt()}.';
-      });
-      return;
-    }
-    if (blouseQty > widget.item.blousePendingSupplierQuantity) {
-      setState(() {
-        _error =
-            'Blouse quantity cannot exceed pending balance of ${widget.item.blousePendingSupplierQuantity.toInt()}.';
-      });
-      return;
-    }
-
-    setState(() {
-      _isSubmitting = true;
-      _error = null;
-    });
-
-    final repo = ref.read(challanRepositoryProvider);
-    final result = await repo.fulfillSupplierMaterial(
-      challanId: widget.challan.challanId,
-      challanItemId: widget.item.challanItemId,
-      sareeQuantity: sareeQty,
-      laceQuantity: laceQty,
-      blouseQuantity: blouseQty,
-      notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
-    );
-
-    if (!mounted) return;
-
-    result.when(
-      success: (_) {
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            backgroundColor: Colors.green,
-            content: Row(
-              children: [
-                Icon(Icons.check_circle, color: Colors.white),
-                SizedBox(width: 8),
-                Text('Material delivery recorded with date and time!'),
-              ],
-            ),
-          ),
-        );
-      },
-      failure: (err) {
-        setState(() {
-          _isSubmitting = false;
-          _error = err.message;
-        });
-      },
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final item = widget.item;
-
-    return AlertDialog(
-      title: Row(
-        children: [
-          Icon(Icons.add_shopping_cart, color: theme.colorScheme.primary),
-          const SizedBox(width: 8),
-          const Expanded(child: Text('Supply Remaining Material')),
-        ],
-      ),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.productNameSnapshot,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'SKU: ${item.skuSnapshot} ${item.colorNameSnapshot != null ? "(${item.colorNameSnapshot})" : ""}',
-                      style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              if (_error != null) ...[
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.red.shade50,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.red, fontSize: 13),
-                  ),
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // Saree input (if pending)
-              if (item.sareePendingSupplierQuantity > 0) ...[
-                _buildQuantityField(
-                  controller: _sareeCtrl,
-                  label: 'Saree Pieces',
-                  pending: item.sareePendingSupplierQuantity,
-                  icon: Icons.checkroom,
-                  color: Colors.blue,
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // Lace input (if pending)
-              if (item.lacePendingSupplierQuantity > 0) ...[
-                _buildQuantityField(
-                  controller: _laceCtrl,
-                  label: 'Lace Pieces',
-                  pending: item.lacePendingSupplierQuantity,
-                  icon: Icons.line_style,
-                  color: Colors.amber.shade800,
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              // Blouse input (if pending)
-              if (item.blousePendingSupplierQuantity > 0) ...[
-                _buildQuantityField(
-                  controller: _blouseCtrl,
-                  label: 'Blouse Pieces',
-                  pending: item.blousePendingSupplierQuantity,
-                  icon: Icons.dry_cleaning,
-                  color: Colors.purple,
-                ),
-                const SizedBox(height: 12),
-              ],
-
-              TextField(
-                controller: _notesCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Delivery Notes (Optional)',
-                  hintText: 'e.g. Delivered remaining 20 pcs',
-                  prefixIcon: Icon(Icons.notes),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(
-          onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _isSubmitting ? null : _submit,
-          child: _isSubmitting
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                )
-              : const Text('Confirm Delivery'),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildQuantityField({
-    required TextEditingController controller,
-    required String label,
-    required double pending,
-    required IconData icon,
-    required Color color,
-  }) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: TextInputType.number,
-      decoration: InputDecoration(
-        labelText: '$label (Pending: ${pending.toInt()})',
-        prefixIcon: Icon(icon, color: color),
-        suffixIcon: TextButton(
-          onPressed: () {
-            controller.text = pending.toInt().toString();
-          },
-          child: const Text('MAX', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
-        ),
-      ),
-      validator: (v) {
-        final val = double.tryParse(v ?? '');
-        if (val == null || val < 0) {
-          return 'Enter 0 or positive number';
-        }
-        if (val > pending) {
-          return 'Max allowed is ${pending.toInt()}';
-        }
-        return null;
-      },
-    );
-  }
-}
-
 /// Helper model to represent a group of material deliveries in one delivery batch.
 class _DeliveryBatchGroup {
   _DeliveryBatchGroup({
@@ -944,8 +668,10 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final supplierTxAsync = ref.watch(supplierTransactionsForChallanProvider(challanId));
-    final productionTxAsync = ref.watch(productionTransactionsForChallanProvider(challanId));
+    final supplierTxAsync =
+        ref.watch(supplierTransactionsForChallanProvider(challanId));
+    final productionTxAsync =
+        ref.watch(productionTransactionsForChallanProvider(challanId));
 
     return Card(
       elevation: 1,
@@ -970,10 +696,10 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
             const SizedBox(height: 6),
             Text(
               'Complete audit trail of all raw-material deliveries and finished saree returns with timestamp.',
-              style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: Colors.grey.shade700),
             ),
             const Divider(height: 24),
-
             supplierTxAsync.when(
               loading: () => const Center(
                 child: Padding(
@@ -992,7 +718,8 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
                   ),
                   error: (err, _) => ErrorView(message: err.toString()),
                   data: (productionTransactions) {
-                    if (supplierTransactions.isEmpty && productionTransactions.isEmpty) {
+                    if (supplierTransactions.isEmpty &&
+                        productionTransactions.isEmpty) {
                       return Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -1002,7 +729,8 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
                         ),
                         child: Column(
                           children: [
-                            Icon(Icons.receipt_long_outlined, size: 40, color: Colors.grey.shade400),
+                            Icon(Icons.receipt_long_outlined,
+                                size: 40, color: Colors.grey.shade400),
                             const SizedBox(height: 8),
                             Text(
                               'No Transactions Recorded Yet',
@@ -1053,29 +781,37 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: batchList.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 12),
                             itemBuilder: (context, index) {
                               final batch = batchList[index];
-                              final isInitial = batch.allocationType == AllocationType.newChallan;
+                              final isInitial = batch.allocationType ==
+                                  AllocationType.newChallan;
                               final dateFormatted =
-                                  DateFormat('dd MMM yyyy, hh:mm:ss a').format(batch.createdAt);
+                                  DateFormat('dd MMM yyyy, hh:mm:ss a')
+                                      .format(batch.createdAt);
 
                               return Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
                                   color: isInitial
-                                      ? Colors.blue.shade50.withValues(alpha: 0.4)
-                                      : Colors.green.shade50.withValues(alpha: 0.4),
+                                      ? Colors.blue.shade50
+                                          .withValues(alpha: 0.4)
+                                      : Colors.green.shade50
+                                          .withValues(alpha: 0.4),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: isInitial ? Colors.blue.shade200 : Colors.green.shade300,
+                                    color: isInitial
+                                        ? Colors.blue.shade200
+                                        : Colors.green.shade300,
                                   ),
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.spaceBetween,
                                       children: [
                                         Row(
                                           children: [
@@ -1084,7 +820,9 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
                                                   ? Icons.local_shipping
                                                   : Icons.check_circle,
                                               size: 18,
-                                              color: isInitial ? Colors.blue : Colors.green.shade700,
+                                              color: isInitial
+                                                  ? Colors.blue
+                                                  : Colors.green.shade700,
                                             ),
                                             const SizedBox(width: 8),
                                             Text(
@@ -1108,10 +846,13 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
                                             color: isInitial
                                                 ? Colors.blue.shade100
                                                 : Colors.green.shade100,
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius:
+                                                BorderRadius.circular(12),
                                           ),
                                           child: Text(
-                                            isInitial ? 'Initial Supply' : 'Fulfillment',
+                                            isInitial
+                                                ? 'Initial Supply'
+                                                : 'Fulfillment',
                                             style: TextStyle(
                                               fontSize: 11,
                                               fontWeight: FontWeight.bold,
@@ -1126,7 +867,8 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
                                     const SizedBox(height: 6),
                                     Row(
                                       children: [
-                                        const Icon(Icons.access_time, size: 14, color: Colors.grey),
+                                        const Icon(Icons.access_time,
+                                            size: 14, color: Colors.grey),
                                         const SizedBox(width: 4),
                                         Text(
                                           dateFormatted,
@@ -1146,7 +888,8 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
                                         return _buildMaterialDeliveryBadge(tx);
                                       }).toList(),
                                     ),
-                                    if (batch.notes != null && batch.notes!.isNotEmpty) ...[
+                                    if (batch.notes != null &&
+                                        batch.notes!.isNotEmpty) ...[
                                       const SizedBox(height: 8),
                                       Text(
                                         'Notes: ${batch.notes}',
@@ -1180,29 +923,37 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             itemCount: productionTransactions.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 8),
+                            separatorBuilder: (_, __) =>
+                                const SizedBox(height: 8),
                             itemBuilder: (context, index) {
                               final ptx = productionTransactions[index];
                               final dateFormatted =
-                                  DateFormat('dd MMM yyyy, hh:mm:ss a').format(ptx.createdAt);
+                                  DateFormat('dd MMM yyyy, hh:mm:ss a')
+                                      .format(ptx.createdAt);
 
                               return Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: Colors.purple.shade50.withValues(alpha: 0.4),
+                                  color: Colors.purple.shade50
+                                      .withValues(alpha: 0.4),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.purple.shade200),
+                                  border:
+                                      Border.all(color: Colors.purple.shade200),
                                 ),
                                 child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Row(
                                           children: [
-                                            const Icon(Icons.assignment_turned_in,
-                                                size: 16, color: Colors.purple),
+                                            const Icon(
+                                                Icons.assignment_turned_in,
+                                                size: 16,
+                                                color: Colors.purple),
                                             const SizedBox(width: 6),
                                             Text(
                                               'SKU: ${ptx.sku}',

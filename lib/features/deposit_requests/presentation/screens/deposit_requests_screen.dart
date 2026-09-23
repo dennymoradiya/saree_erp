@@ -103,12 +103,19 @@ class _DepositRequestsScreenState extends ConsumerState<DepositRequestsScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.assignment_turned_in_outlined,
-                            size: 48, color: Colors.grey,),
+                        const Icon(
+                          Icons.assignment_turned_in_outlined,
+                          size: 48,
+                          color: Colors.grey,
+                        ),
                         const SizedBox(height: 12),
-                        const Text('No Deposit Requests',
-                            style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold,),),
+                        const Text(
+                          'No Deposit Requests',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           _selectedStatus == DepositRequestStatus.pending
@@ -185,11 +192,13 @@ class _DepositRequestCard extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(true),
-              child: const Text('Approve'),),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Approve'),
+          ),
         ],
       ),
     );
@@ -203,7 +212,8 @@ class _DepositRequestCard extends ConsumerWidget {
       success: (_) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Deposit request approved and challans updated.'),),
+            content: Text('Deposit request approved and challans updated.'),
+          ),
         );
         onApproved();
       },
@@ -221,8 +231,9 @@ class _DepositRequestCard extends ConsumerWidget {
             content: Text(err.message),
             actions: [
               FilledButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: const Text('OK'),),
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
             ],
           ),
         );
@@ -252,8 +263,9 @@ class _DepositRequestCard extends ConsumerWidget {
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),),
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -327,9 +339,10 @@ class _DepositRequestCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text('Submitted: $dateStr',
-                style:
-                    TextStyle(color: theme.colorScheme.outline, fontSize: 12),),
+            Text(
+              'Submitted: $dateStr',
+              style: TextStyle(color: theme.colorScheme.outline, fontSize: 12),
+            ),
             if (request.notes != null && request.notes!.isNotEmpty) ...[
               const SizedBox(height: 4),
               Text('Notes: ${request.notes!}'),
@@ -339,7 +352,9 @@ class _DepositRequestCard extends ConsumerWidget {
               Text(
                 'Rejection Reason: ${request.rejectionReason!}',
                 style: const TextStyle(
-                    color: Colors.red, fontWeight: FontWeight.bold,),
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
             const Divider(height: 16),
@@ -358,7 +373,9 @@ class _DepositRequestCard extends ConsumerWidget {
                     Text(
                       '${item.requestedQuantity.toInt()} sarees',
                       style: const TextStyle(
-                          fontWeight: FontWeight.bold, color: Colors.blue,),
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue,
+                      ),
                     ),
                   ],
                 ),
@@ -493,7 +510,8 @@ class _ManualReturnDialogState extends ConsumerState<ManualReturnDialog> {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-              content: Text('Manual production return recorded successfully.'),),
+            content: Text('Manual production return recorded successfully.'),
+          ),
         );
       },
       failure: (err) {
@@ -526,8 +544,10 @@ class _ManualReturnDialogState extends ConsumerState<ManualReturnDialog> {
                     padding: const EdgeInsets.all(8),
                     margin: const EdgeInsets.only(bottom: 12),
                     color: Colors.red.shade50,
-                    child: Text(_error!,
-                        style: const TextStyle(color: Colors.red),),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ),
                 usersAsync.when(
                   loading: () => const LinearProgressIndicator(),
@@ -558,8 +578,9 @@ class _ManualReturnDialogState extends ConsumerState<ManualReturnDialog> {
                       decoration: const InputDecoration(labelText: 'Product *'),
                       items: activeProducts.map((p) {
                         return DropdownMenuItem(
-                            value: p,
-                            child: Text('${p.name} (${p.productCode})'),);
+                          value: p,
+                          child: Text('${p.name} (${p.productCode})'),
+                        );
                       }).toList(),
                       onChanged: (p) => setState(() {
                         _selectedProduct = p;
@@ -636,7 +657,8 @@ class _ManualReturnDialogState extends ConsumerState<ManualReturnDialog> {
               ? const SizedBox(
                   width: 18,
                   height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),)
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
               : const Text('Record Return'),
         ),
       ],

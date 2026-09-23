@@ -31,7 +31,8 @@ class DepositRequestFilter {
 }
 
 final depositRequestsStreamProvider =
-    StreamProvider.family<List<DepositRequest>, DepositRequestFilter>((ref, filter) {
+    StreamProvider.family<List<DepositRequest>, DepositRequestFilter>(
+        (ref, filter) {
   final repo = ref.watch(depositRequestRepositoryProvider);
   return repo.watchDepositRequests(
     stitchingUserId: filter.stitchingUserId,

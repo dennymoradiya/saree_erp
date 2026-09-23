@@ -142,5 +142,21 @@ void main() {
       expect(stateCustom.matchesDate(DateTime(2026, 9, 15)), isTrue);
       expect(stateCustom.matchesDate(DateTime(2026, 10, 1)), isFalse);
     });
+
+    test('availableFilters includes allTime only for admin users', () {
+      final adminFilters = LedgerDateFilter.availableFilters(isAdmin: true);
+      expect(adminFilters, contains(LedgerDateFilter.allTime));
+      expect(adminFilters.length, LedgerDateFilter.values.length);
+
+      final nonAdminFilters = LedgerDateFilter.availableFilters(isAdmin: false);
+      expect(nonAdminFilters, isNot(contains(LedgerDateFilter.allTime)));
+      expect(nonAdminFilters, [
+        LedgerDateFilter.today,
+        LedgerDateFilter.yesterday,
+        LedgerDateFilter.last7Days,
+        LedgerDateFilter.thisMonth,
+        LedgerDateFilter.custom,
+      ]);
+    });
   });
 }

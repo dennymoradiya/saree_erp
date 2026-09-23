@@ -1,6 +1,7 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide MaterialType;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:saree_sutra/core/enums/material_type.dart';
 import 'package:saree_sutra/core/enums/user_role.dart';
 import 'package:saree_sutra/core/routing/route_paths.dart';
 import 'package:saree_sutra/features/auth/presentation/controllers/auth_providers.dart';
@@ -12,8 +13,10 @@ import 'package:saree_sutra/features/dashboard/presentation/screens/stitching_us
 import 'package:saree_sutra/features/dashboard/presentation/screens/supplier_dashboard_screen.dart';
 import 'package:saree_sutra/features/deposit_requests/presentation/screens/deposit_requests_screen.dart';
 import 'package:saree_sutra/features/products/presentation/screens/products_screen.dart';
+import 'package:saree_sutra/features/stitching_ledger/presentation/screens/pending_returns_ledger_screen.dart';
 import 'package:saree_sutra/features/stitching_ledger/presentation/screens/stitching_ledger_screen.dart';
 import 'package:saree_sutra/features/supplier_ledger/presentation/screens/supplier_ledger_screen.dart';
+import 'package:saree_sutra/features/suppliers/presentation/screens/supplier_pending_materials_screen.dart';
 import 'package:saree_sutra/features/suppliers/presentation/screens/suppliers_screen.dart';
 import 'package:saree_sutra/features/users/presentation/screens/stitching_users_screen.dart';
 
@@ -107,6 +110,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: 'stitching-ledger',
             builder: (context, state) => const StitchingLedgerScreen(),
           ),
+          GoRoute(
+            path: 'pending-returns-ledger',
+            builder: (context, state) => const PendingReturnsLedgerScreen(),
+          ),
         ],
       ),
       GoRoute(
@@ -116,6 +123,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'ledger',
             builder: (context, state) => const StitchingLedgerScreen(),
+          ),
+          GoRoute(
+            path: 'pending-returns-ledger',
+            builder: (context, state) => const PendingReturnsLedgerScreen(),
           ),
         ],
       ),
@@ -136,6 +147,26 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: 'ledger',
             builder: (context, state) => const SupplierLedgerScreen(),
+          ),
+          GoRoute(
+            path: 'pending-materials',
+            builder: (context, state) {
+              final authUser = ProviderScope.containerOf(context, listen: false)
+                  .read(authStateChangesProvider)
+                  .value;
+              final extra = state.extra;
+              final MaterialType? initialType = extra is MaterialType
+                  ? extra
+                  : (state.uri.queryParameters['type'] != null
+                      ? MaterialType.fromValue(
+                          state.uri.queryParameters['type'],
+                        )
+                      : null);
+              return SupplierPendingMaterialsScreen(
+                supplierId: authUser?.supplierId ?? '',
+                initialMaterialType: initialType,
+              );
+            },
           ),
         ],
       ),
