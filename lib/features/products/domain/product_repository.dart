@@ -34,6 +34,13 @@ abstract interface class ProductRepository {
     String? colorCode,
   });
 
+  Future<Result<void>> updateProductSku({
+    required String productId,
+    required String sku,
+    required String colorName,
+    String? colorCode,
+  });
+
   Future<Result<void>> toggleProductStatus({
     required String productId,
     required bool isActive,

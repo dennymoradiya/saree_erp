@@ -444,6 +444,7 @@ class FirebaseChallanRepository implements ChallanRepository {
           'createdAt': now,
           'updatedAt': now,
           'notes': input.notes?.trim(),
+          if (input.imageUrl != null) 'imageUrl': input.imageUrl,
         });
 
         // 7. Write audit log
@@ -477,6 +478,7 @@ class FirebaseChallanRepository implements ChallanRepository {
           createdAt: nowDt,
           updatedAt: nowDt,
           notes: input.notes?.trim(),
+          imageUrl: input.imageUrl,
         );
       });
 
@@ -679,6 +681,45 @@ class FirebaseChallanRepository implements ChallanRepository {
           },
           'createdAt': now,
         });
+      });
+
+      return const Success(null);
+    } catch (e) {
+      return Failure(mapFirebaseError(e));
+    }
+  }
+
+  @override
+  Future<Result<void>> updateChallanImage({
+    required String challanId,
+    required String? imageUrl,
+  }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      return const Failure(PermissionDeniedException('Sign in required.'));
+    }
+
+    try {
+      final challanRef =
+          _firestore.collection(FirestorePaths.challans).doc(challanId);
+      final now = FieldValue.serverTimestamp();
+
+      await challanRef.update({
+        'imageUrl': imageUrl,
+        'updatedAt': now,
+      });
+
+      final auditRef = _firestore.collection(FirestorePaths.auditLogs).doc();
+      await auditRef.set({
+        'logId': auditRef.id,
+        'action': 'CHALLAN_IMAGE_UPDATED',
+        'actorId': currentUser.uid,
+        'actorRole': 'user',
+        'entityType': 'challan',
+        'entityId': challanId,
+        'beforeData': null,
+        'afterData': {'imageUrl': imageUrl},
+        'createdAt': now,
       });
 
       return const Success(null);

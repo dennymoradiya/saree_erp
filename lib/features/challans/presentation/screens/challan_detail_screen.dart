@@ -1,16 +1,21 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart' hide MaterialType;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:saree_sutra/core/enums/allocation_type.dart';
 import 'package:saree_sutra/core/enums/challan_status.dart';
 import 'package:saree_sutra/core/enums/material_type.dart';
+import 'package:saree_sutra/core/utils/image_upload_helper.dart';
 import 'package:saree_sutra/core/utils/whatsapp_share_helper.dart';
 import 'package:saree_sutra/core/widgets/async_state_widgets.dart';
+import 'package:saree_sutra/core/widgets/product_color_dot.dart';
 import 'package:saree_sutra/features/challans/domain/challan.dart';
 import 'package:saree_sutra/features/challans/domain/challan_item.dart';
 import 'package:saree_sutra/features/challans/presentation/controllers/challan_providers.dart';
 import 'package:saree_sutra/features/challans/presentation/widgets/fulfill_supplier_material_dialog.dart';
+import 'package:saree_sutra/core/utils/challan_pdf_generator.dart';
 import 'package:saree_sutra/features/suppliers/presentation/controllers/suppliers_providers.dart';
+import 'package:saree_sutra/features/transactions/domain/material_transaction.dart';
 import 'package:saree_sutra/features/transactions/domain/supplier_material_transaction.dart';
 import 'package:saree_sutra/features/users/presentation/controllers/users_providers.dart';
 
@@ -158,6 +163,7 @@ class ChallanDetailScreen extends ConsumerWidget {
       supplierName: supplierName,
       stitchingUserName: stitchingUserName,
       notes: liveChallan.notes,
+      imageUrl: liveChallan.imageUrl,
       items: shareItems,
     );
 
@@ -165,6 +171,197 @@ class ChallanDetailScreen extends ConsumerWidget {
       phoneNumber: stitchingUserPhone,
       message: message,
     );
+  }
+
+  void _showPdfOptions(
+    BuildContext context,
+    WidgetRef ref,
+    Challan liveChallan,
+    List<ChallanItem> items,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (bottomSheetCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFFE3F2FD),
+                    child: Icon(Icons.share, color: Colors.blue),
+                  ),
+                  title: const Text(
+                    'Share / Download PDF',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'Save to device, send via WhatsApp, Drive, or Email',
+                  ),
+                  onTap: () {
+                    Navigator.pop(bottomSheetCtx);
+                    _generateAndHandlePdf(
+                      context,
+                      ref,
+                      liveChallan,
+                      items,
+                      isPrint: false,
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const CircleAvatar(
+                    backgroundColor: Color(0xFFEDE7F6),
+                    child: Icon(Icons.print, color: Colors.deepPurple),
+                  ),
+                  title: const Text(
+                    'Print / Preview PDF',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text(
+                    'Preview pages and print directly to a printer',
+                  ),
+                  onTap: () {
+                    Navigator.pop(bottomSheetCtx);
+                    _generateAndHandlePdf(
+                      context,
+                      ref,
+                      liveChallan,
+                      items,
+                      isPrint: true,
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _generateAndHandlePdf(
+    BuildContext context,
+    WidgetRef ref,
+    Challan liveChallan,
+    List<ChallanItem> items, {
+    required bool isPrint,
+  }) async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            ),
+            SizedBox(width: 14),
+            Text('Preparing Challan PDF...'),
+          ],
+        ),
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    List<ChallanItem> currentItems = items;
+    if (currentItems.isEmpty) {
+      try {
+        currentItems = await ref
+            .read(challanRepositoryProvider)
+            .watchChallanItems(liveChallan.challanId)
+            .first
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {}
+    }
+
+    final suppliers = ref.read(suppliersListProvider).asData?.value ?? [];
+    final stitchingUsers =
+        ref.read(stitchingUsersListProvider).asData?.value ?? [];
+
+    var supplierName = liveChallan.supplierId;
+    for (final s in suppliers) {
+      if (s.supplierId == liveChallan.supplierId) {
+        supplierName = s.name;
+        break;
+      }
+    }
+
+    var stitchingUserName = liveChallan.stitchingUserId;
+    String? stitchingUserPhone;
+    for (final u in stitchingUsers) {
+      if (u.stitchingUserId == liveChallan.stitchingUserId) {
+        stitchingUserName = u.name;
+        stitchingUserPhone = u.phone;
+        break;
+      }
+    }
+
+    List<SupplierMaterialTransaction> supplierTx = ref
+            .read(supplierTransactionsForChallanProvider(liveChallan.challanId))
+            .asData
+            ?.value ??
+        [];
+    if (supplierTx.isEmpty) {
+      try {
+        supplierTx = await ref
+            .read(challanRepositoryProvider)
+            .watchSupplierTransactionsForChallan(liveChallan.challanId)
+            .first
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {}
+    }
+
+    List<MaterialTransaction> prodTx = ref
+            .read(
+                productionTransactionsForChallanProvider(liveChallan.challanId))
+            .asData
+            ?.value ??
+        [];
+    if (prodTx.isEmpty) {
+      try {
+        prodTx = await ref
+            .read(challanRepositoryProvider)
+            .watchProductionTransactionsForChallan(liveChallan.challanId)
+            .first
+            .timeout(const Duration(seconds: 2));
+      } catch (_) {}
+    }
+
+    final params = ChallanPdfParams(
+      challan: liveChallan,
+      items: currentItems,
+      supplierName: supplierName,
+      stitchingUserName: stitchingUserName,
+      stitchingUserPhone: stitchingUserPhone,
+      supplierTransactions: supplierTx,
+      productionTransactions: prodTx,
+    );
+
+    if (!context.mounted) return;
+
+    if (isPrint) {
+      await ChallanPdfGenerator.previewOrPrintPdf(context, params);
+    } else {
+      await ChallanPdfGenerator.downloadOrSharePdf(context, params);
+    }
   }
 
   @override
@@ -182,6 +379,16 @@ class ChallanDetailScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(liveChallan.challanNumber),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.picture_as_pdf, color: Colors.redAccent),
+            tooltip: 'Download / Share PDF',
+            onPressed: () => _showPdfOptions(
+              context,
+              ref,
+              liveChallan,
+              itemsAsync.asData?.value ?? [],
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.share, color: Color(0xFF25D366)),
             tooltip: 'Share on WhatsApp',
@@ -259,24 +466,46 @@ class ChallanDetailScreen extends ConsumerWidget {
                       ),
                     ],
                     const SizedBox(height: 12),
-                    FilledButton.icon(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF25D366),
-                        foregroundColor: Colors.white,
-                      ),
-                      onPressed: () => _shareChallan(
-                        context,
-                        ref,
-                        liveChallan,
-                        itemsAsync.asData?.value ?? [],
-                      ),
-                      icon: const Icon(Icons.share, size: 18),
-                      label: const Text('Share Challan on WhatsApp'),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.red.shade700,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () => _showPdfOptions(
+                            context,
+                            ref,
+                            liveChallan,
+                            itemsAsync.asData?.value ?? [],
+                          ),
+                          icon: const Icon(Icons.picture_as_pdf, size: 18),
+                          label: const Text('Download / Print PDF'),
+                        ),
+                        FilledButton.icon(
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF25D366),
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () => _shareChallan(
+                            context,
+                            ref,
+                            liveChallan,
+                            itemsAsync.asData?.value ?? [],
+                          ),
+                          icon: const Icon(Icons.share, size: 18),
+                          label: const Text('Share on WhatsApp'),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
             ),
+            const SizedBox(height: 16),
+            _ChallanImageCard(challan: liveChallan),
             const SizedBox(height: 20),
 
             Text(
@@ -318,7 +547,10 @@ class ChallanDetailScreen extends ConsumerWidget {
             const SizedBox(height: 24),
 
             // Dimension C: Transaction & Delivery History Timeline
-            _ChallanTransactionHistorySection(challanId: liveChallan.challanId),
+            _ChallanTransactionHistorySection(
+              challanId: liveChallan.challanId,
+              challanItems: itemsAsync.asData?.value,
+            ),
             const SizedBox(height: 32),
           ],
         ),
@@ -369,6 +601,11 @@ class _ChallanItemDetailCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
+                ProductColorDot(
+                  colorName: item.colorNameSnapshot,
+                  size: 16,
+                ),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     '${item.productNameSnapshot} — ${item.colorNameSnapshot ?? ''} (${item.skuSnapshot})',
@@ -661,9 +898,13 @@ class _DeliveryBatchGroup {
 
 /// Section displaying the full transaction history with exact date and time.
 class _ChallanTransactionHistorySection extends ConsumerWidget {
-  const _ChallanTransactionHistorySection({required this.challanId});
+  const _ChallanTransactionHistorySection({
+    required this.challanId,
+    this.challanItems,
+  });
 
   final String challanId;
+  final List<ChallanItem>? challanItems;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -672,6 +913,19 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
         ref.watch(supplierTransactionsForChallanProvider(challanId));
     final productionTxAsync =
         ref.watch(productionTransactionsForChallanProvider(challanId));
+    final itemsAsync = ref.watch(challanItemsStreamProvider(challanId));
+    final items = challanItems ?? itemsAsync.asData?.value ?? [];
+
+    final Map<String, ChallanItem> itemMapById = {
+      for (final it in items) it.challanItemId: it,
+    };
+    final Map<String, ChallanItem> itemMapBySku = {
+      for (final it in items) it.sku: it,
+    };
+
+    ChallanItem? findItem(String challanItemId, String sku) {
+      return itemMapById[challanItemId] ?? itemMapBySku[sku];
+    }
 
     return Card(
       elevation: 1,
@@ -881,12 +1135,178 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
                                       ],
                                     ),
                                     const SizedBox(height: 10),
-                                    Wrap(
-                                      spacing: 8,
-                                      runSpacing: 6,
-                                      children: batch.items.map((tx) {
-                                        return _buildMaterialDeliveryBadge(tx);
-                                      }).toList(),
+                                    // Group transactions in this delivery batch by item / SKU
+                                    Builder(
+                                      builder: (context) {
+                                        final Map<
+                                                String,
+                                                List<
+                                                    SupplierMaterialTransaction>>
+                                            itemGroups = {};
+                                        for (final tx in batch.items) {
+                                          final key =
+                                              tx.challanItemId.isNotEmpty
+                                                  ? tx.challanItemId
+                                                  : tx.sku;
+                                          itemGroups
+                                              .putIfAbsent(key, () => [])
+                                              .add(tx);
+                                        }
+
+                                        return Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children:
+                                              itemGroups.entries.map((entry) {
+                                            final groupTxs = entry.value;
+                                            final firstTx = groupTxs.first;
+                                            final challanItem = findItem(
+                                              firstTx.challanItemId,
+                                              firstTx.sku,
+                                            );
+                                            final productName = challanItem
+                                                    ?.productNameSnapshot ??
+                                                'Product';
+                                            final colorName =
+                                                challanItem?.colorNameSnapshot;
+                                            final sku =
+                                                challanItem?.skuSnapshot ??
+                                                    firstTx.sku;
+
+                                            return Container(
+                                              margin:
+                                                  const EdgeInsets.only(top: 8),
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white,
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                border: Border.all(
+                                                  color: isInitial
+                                                      ? Colors.blue.shade100
+                                                      : Colors.green.shade200,
+                                                ),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons
+                                                            .checkroom_outlined,
+                                                        size: 15,
+                                                        color: theme.colorScheme
+                                                            .primary,
+                                                      ),
+                                                      const SizedBox(width: 6),
+                                                      Expanded(
+                                                        child: Wrap(
+                                                          crossAxisAlignment:
+                                                              WrapCrossAlignment
+                                                                  .center,
+                                                          spacing: 6,
+                                                          children: [
+                                                            Text(
+                                                              productName,
+                                                              style:
+                                                                  const TextStyle(
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                fontSize: 13,
+                                                              ),
+                                                            ),
+                                                            if (colorName !=
+                                                                    null &&
+                                                                colorName
+                                                                    .isNotEmpty)
+                                                              Container(
+                                                                padding:
+                                                                    const EdgeInsets
+                                                                        .symmetric(
+                                                                  horizontal: 6,
+                                                                  vertical: 1.5,
+                                                                ),
+                                                                decoration:
+                                                                    BoxDecoration(
+                                                                  color: theme
+                                                                      .colorScheme
+                                                                      .primaryContainer
+                                                                      .withValues(
+                                                                    alpha: 0.6,
+                                                                  ),
+                                                                  borderRadius:
+                                                                      BorderRadius
+                                                                          .circular(
+                                                                    4,
+                                                                  ),
+                                                                ),
+                                                                child: Row(
+                                                                  mainAxisSize:
+                                                                      MainAxisSize
+                                                                          .min,
+                                                                  children: [
+                                                                    ProductColorDot(
+                                                                      colorName:
+                                                                          colorName,
+                                                                      size: 10,
+                                                                    ),
+                                                                    const SizedBox(
+                                                                      width: 4,
+                                                                    ),
+                                                                    Text(
+                                                                      colorName,
+                                                                      style:
+                                                                          TextStyle(
+                                                                        fontSize:
+                                                                            11,
+                                                                        fontWeight:
+                                                                            FontWeight.w600,
+                                                                        color: theme
+                                                                            .colorScheme
+                                                                            .onPrimaryContainer,
+                                                                      ),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                              ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                      if (sku.isNotEmpty)
+                                                        Text(
+                                                          sku,
+                                                          style: TextStyle(
+                                                            fontSize: 11,
+                                                            color: Colors
+                                                                .grey.shade600,
+                                                            fontFamily:
+                                                                'monospace',
+                                                          ),
+                                                        ),
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 8),
+                                                  Wrap(
+                                                    spacing: 8,
+                                                    runSpacing: 6,
+                                                    children: groupTxs
+                                                        .map(
+                                                          (tx) =>
+                                                              _buildMaterialDeliveryBadge(
+                                                            tx,
+                                                          ),
+                                                        )
+                                                        .toList(),
+                                                  ),
+                                                ],
+                                              ),
+                                            );
+                                          }).toList(),
+                                        );
+                                      },
                                     ),
                                     if (batch.notes != null &&
                                         batch.notes!.isNotEmpty) ...[
@@ -930,6 +1350,14 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
                               final dateFormatted =
                                   DateFormat('dd MMM yyyy, hh:mm:ss a')
                                       .format(ptx.createdAt);
+                              final pItem = findItem(
+                                ptx.challanItemId,
+                                ptx.sku,
+                              );
+                              final pProductName =
+                                  pItem?.productNameSnapshot ?? 'Product';
+                              final pColorName = pItem?.colorNameSnapshot;
+                              final pSku = pItem?.skuSnapshot ?? ptx.sku;
 
                               return Container(
                                 padding: const EdgeInsets.all(10),
@@ -944,36 +1372,102 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
                                   children: [
-                                    Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            const Icon(
-                                                Icons.assignment_turned_in,
-                                                size: 16,
-                                                color: Colors.purple),
-                                            const SizedBox(width: 6),
-                                            Text(
-                                              'SKU: ${ptx.sku}',
-                                              style: const TextStyle(
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 12,
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Row(
+                                            children: [
+                                              const Icon(
+                                                  Icons.assignment_turned_in,
+                                                  size: 16,
+                                                  color: Colors.purple),
+                                              const SizedBox(width: 6),
+                                              Expanded(
+                                                child: Wrap(
+                                                  crossAxisAlignment:
+                                                      WrapCrossAlignment.center,
+                                                  spacing: 6,
+                                                  children: [
+                                                    Text(
+                                                      pProductName,
+                                                      style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.bold,
+                                                        fontSize: 12,
+                                                      ),
+                                                    ),
+                                                    if (pColorName != null &&
+                                                        pColorName.isNotEmpty)
+                                                      Container(
+                                                        padding:
+                                                            const EdgeInsets
+                                                                .symmetric(
+                                                          horizontal: 5,
+                                                          vertical: 1,
+                                                        ),
+                                                        decoration:
+                                                            BoxDecoration(
+                                                          color: Colors
+                                                              .purple.shade100,
+                                                          borderRadius:
+                                                              BorderRadius
+                                                                  .circular(4),
+                                                        ),
+                                                        child: Row(
+                                                          mainAxisSize:
+                                                              MainAxisSize.min,
+                                                          children: [
+                                                            ProductColorDot(
+                                                              colorName:
+                                                                  pColorName,
+                                                              size: 10,
+                                                            ),
+                                                            const SizedBox(
+                                                              width: 4,
+                                                            ),
+                                                            Text(
+                                                              pColorName,
+                                                              style: TextStyle(
+                                                                fontSize: 10,
+                                                                fontWeight:
+                                                                    FontWeight
+                                                                        .bold,
+                                                                color: Colors
+                                                                    .purple
+                                                                    .shade900,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    Text(
+                                                      '($pSku)',
+                                                      style: TextStyle(
+                                                        fontSize: 11,
+                                                        color: Colors
+                                                            .grey.shade600,
+                                                        fontFamily: 'monospace',
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
                                               ),
-                                            ),
-                                          ],
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          dateFormatted,
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: Colors.grey.shade600,
+                                            ],
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            dateFormatted,
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
+                                    const SizedBox(width: 8),
                                     Chip(
                                       label: Text(
                                         '+${ptx.quantity.toInt()} Sarees Returned',
@@ -1009,24 +1503,28 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
     IconData icon;
     String label;
 
+    final qtyStr = tx.quantity % 1 == 0
+        ? tx.quantity.toInt().toString()
+        : tx.quantity.toString();
+
     switch (tx.materialType) {
       case MaterialType.saree:
         bg = Colors.blue.shade100;
         fg = Colors.blue.shade900;
-        icon = Icons.checkroom;
-        label = '${tx.quantity.toInt()} Saree Pieces';
+        icon = Icons.layers_outlined;
+        label = '$qtyStr Saree Fabric';
         break;
       case MaterialType.lace:
         bg = Colors.amber.shade100;
         fg = Colors.amber.shade900;
-        icon = Icons.line_style;
-        label = '${tx.quantity.toInt()} Lace Pieces';
+        icon = Icons.content_cut_outlined;
+        label = '$qtyStr Lace Pieces';
         break;
       case MaterialType.blouse:
         bg = Colors.purple.shade100;
         fg = Colors.purple.shade900;
-        icon = Icons.dry_cleaning;
-        label = '${tx.quantity.toInt()} Blouse Pieces';
+        icon = Icons.checkroom;
+        label = '$qtyStr Blouse Pieces';
         break;
     }
 
@@ -1051,6 +1549,383 @@ class _ChallanTransactionHistorySection extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ChallanImageCard extends ConsumerStatefulWidget {
+  const _ChallanImageCard({required this.challan});
+
+  final Challan challan;
+
+  @override
+  ConsumerState<_ChallanImageCard> createState() => _ChallanImageCardState();
+}
+
+class _ChallanImageCardState extends ConsumerState<_ChallanImageCard> {
+  bool _isUploading = false;
+
+  Future<void> _pickAndUploadImage() async {
+    final file = await ImageUploadHelper.pickImage(context);
+    if (file == null) return;
+
+    setState(() => _isUploading = true);
+
+    try {
+      final bytes = await file.readAsBytes();
+      final downloadUrl = await ImageUploadHelper.uploadImage(
+        bytes: bytes,
+        storageFolder: 'challans',
+        customFileName:
+            '${widget.challan.challanId}_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+
+      final repo = ref.read(challanRepositoryProvider);
+      final res = await repo.updateChallanImage(
+        challanId: widget.challan.challanId,
+        imageUrl: downloadUrl,
+      );
+
+      if (!mounted) return;
+
+      res.when(
+        success: (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Challan image updated successfully.'),
+              backgroundColor: Colors.green,
+            ),
+          );
+        },
+        failure: (err) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to update challan image: ${err.message}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading image: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
+      }
+    }
+  }
+
+  Future<void> _confirmRemoveImage() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Image'),
+        content: const Text(
+          'Are you sure you want to remove the image attachment from this challan?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isUploading = true);
+
+    try {
+      final repo = ref.read(challanRepositoryProvider);
+      final res = await repo.updateChallanImage(
+        challanId: widget.challan.challanId,
+        imageUrl: null,
+      );
+
+      if (!mounted) return;
+
+      res.when(
+        success: (_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Challan image removed.'),
+            ),
+          );
+        },
+        failure: (err) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to remove image: ${err.message}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        },
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isUploading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final hasImage =
+        widget.challan.imageUrl != null && widget.challan.imageUrl!.isNotEmpty;
+
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.receipt_long_outlined,
+                      color: theme.colorScheme.primary,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Challan Attachment / Photo',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                if (hasImage && !_isUploading)
+                  Row(
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined, size: 20),
+                        tooltip: 'Change Photo',
+                        onPressed: _pickAndUploadImage,
+                      ),
+                      IconButton(
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                          size: 20,
+                        ),
+                        tooltip: 'Remove Photo',
+                        onPressed: _confirmRemoveImage,
+                      ),
+                    ],
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (_isUploading)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 28),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    ),
+                    SizedBox(height: 12),
+                    Text(
+                      'Uploading image...',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else if (hasImage)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      ImageUploadHelper.viewFullScreenImage(
+                        context,
+                        imageUrl: widget.challan.imageUrl!,
+                        title: '${widget.challan.challanNumber} Attachment',
+                      );
+                    },
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Stack(
+                        children: [
+                          CachedNetworkImage(
+                            imageUrl: widget.challan.imageUrl!,
+                            width: double.infinity,
+                            height: 200,
+                            fit: BoxFit.cover,
+                            placeholder: (context, url) => Container(
+                              height: 200,
+                              color: Colors.grey.shade100,
+                              child: const Center(
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                            errorWidget: (context, url, error) => Container(
+                              height: 200,
+                              color: Colors.grey.shade100,
+                              child: const Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(
+                                      Icons.broken_image,
+                                      size: 40,
+                                      color: Colors.grey,
+                                    ),
+                                    SizedBox(height: 8),
+                                    Text('Could not load image'),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: 8,
+                            right: 8,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.65),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.fullscreen,
+                                    color: Colors.white,
+                                    size: 16,
+                                  ),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Tap to zoom',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.fullscreen, size: 18),
+                        label: const Text('View Full Screen'),
+                        onPressed: () {
+                          ImageUploadHelper.viewFullScreenImage(
+                            context,
+                            imageUrl: widget.challan.imageUrl!,
+                            title: '${widget.challan.challanNumber} Attachment',
+                          );
+                        },
+                      ),
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('Change Photo'),
+                        onPressed: _pickAndUploadImage,
+                      ),
+                    ],
+                  ),
+                ],
+              )
+            else
+              InkWell(
+                onTap: _pickAndUploadImage,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 24,
+                    horizontal: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: Colors.grey.shade300,
+                      width: 1.2,
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.grey.shade50,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.add_a_photo_outlined,
+                        size: 32,
+                        color: theme.colorScheme.primary,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Upload Challan Image / Bill Photo',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.primary,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Attach a physical challan photo, bill, or receipt (Camera / Gallery)',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: Colors.grey.shade600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

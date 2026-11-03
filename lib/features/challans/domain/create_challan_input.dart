@@ -50,6 +50,7 @@ class CreateChallanInput {
     required this.stitchingUserId,
     required this.items,
     this.notes,
+    this.imageUrl,
     this.creatorRole = 'admin',
   });
 
@@ -57,5 +58,6 @@ class CreateChallanInput {
   final String stitchingUserId;
   final List<CreateChallanItemInput> items;
   final String? notes;
+  final String? imageUrl;
   final String creatorRole;
 }

@@ -19,6 +19,7 @@ _$ChallanImpl _$$ChallanImplFromJson(Map<String, dynamic> json) =>
       createdAt: const TimestampConverter().fromJson(json['createdAt']),
       updatedAt: const TimestampConverter().fromJson(json['updatedAt']),
       notes: json['notes'] as String?,
+      imageUrl: json['imageUrl'] as String?,
       cancelledReason: json['cancelledReason'] as String?,
       cancelledBy: json['cancelledBy'] as String?,
       cancelledAt:
@@ -38,6 +39,7 @@ Map<String, dynamic> _$$ChallanImplToJson(_$ChallanImpl instance) =>
       'createdAt': const TimestampConverter().toJson(instance.createdAt),
       'updatedAt': const TimestampConverter().toJson(instance.updatedAt),
       'notes': instance.notes,
+      'imageUrl': instance.imageUrl,
       'cancelledReason': instance.cancelledReason,
       'cancelledBy': instance.cancelledBy,
       'cancelledAt':

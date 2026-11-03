@@ -29,6 +29,7 @@ class Challan with _$Challan {
     @TimestampConverter() required DateTime createdAt,
     @TimestampConverter() required DateTime updatedAt,
     String? notes,
+    String? imageUrl,
     String? cancelledReason,
     String? cancelledBy,
     @NullableTimestampConverter() DateTime? cancelledAt,

@@ -172,6 +172,33 @@ class FirebaseProductRepository implements ProductRepository {
   }
 
   @override
+  Future<Result<void>> updateProductSku({
+    required String productId,
+    required String sku,
+    required String colorName,
+    String? colorCode,
+  }) async {
+    try {
+      final trimmedSku = sku.trim().toUpperCase();
+      final trimmedColor = colorName.trim();
+      final skuRef = _firestore
+          .collection(FirestorePaths.products)
+          .doc(productId)
+          .collection(FirestorePaths.productSkus)
+          .doc(trimmedSku);
+
+      await skuRef.update({
+        'colorName': trimmedColor,
+        'colorCode': colorCode?.trim(),
+      });
+
+      return const Success(null);
+    } catch (e) {
+      return Failure(mapFirebaseError(e));
+    }
+  }
+
+  @override
   Future<Result<void>> toggleProductStatus({
     required String productId,
     required bool isActive,

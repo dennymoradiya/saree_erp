@@ -1,9 +1,13 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:saree_sutra/core/enums/user_role.dart';
+import 'package:saree_sutra/core/utils/image_upload_helper.dart';
 import 'package:saree_sutra/core/utils/whatsapp_share_helper.dart';
 import 'package:saree_sutra/core/widgets/async_state_widgets.dart';
+import 'package:saree_sutra/core/widgets/product_color_dot.dart';
 import 'package:saree_sutra/features/auth/presentation/controllers/auth_providers.dart';
 import 'package:saree_sutra/features/challans/domain/create_challan_input.dart';
 import 'package:saree_sutra/features/challans/presentation/controllers/challan_providers.dart';
@@ -32,6 +36,20 @@ class _CreateChallanScreenState extends ConsumerState<CreateChallanScreen> {
   final List<_ChallanItemDraft> _items = [_ChallanItemDraft()];
   bool _isSubmitting = false;
   String? _error;
+
+  XFile? _selectedImage;
+  Uint8List? _selectedImageBytes;
+
+  Future<void> _pickImage() async {
+    final file = await ImageUploadHelper.pickImage(context);
+    if (file != null) {
+      final bytes = await file.readAsBytes();
+      setState(() {
+        _selectedImage = file;
+        _selectedImageBytes = bytes;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -94,14 +112,12 @@ class _CreateChallanScreenState extends ConsumerState<CreateChallanScreen> {
       final laceText = item.laceSuppliedCtrl.text.trim();
       final blouseText = item.blouseSuppliedCtrl.text.trim();
 
-      final sareeSupplied =
-          double.tryParse(sareeText) ?? (sareeText.isEmpty ? sareeQty : 0.0);
+      final sareeSupplied = double.tryParse(sareeText) ?? 0.0;
       final laceSupplied = item.selectedProduct!.requiresLace
-          ? (double.tryParse(laceText) ?? (laceText.isEmpty ? sareeQty : 0.0))
+          ? (double.tryParse(laceText) ?? 0.0)
           : 0.0;
       final blouseSupplied = item.selectedProduct!.requiresBlouse
-          ? (double.tryParse(blouseText) ??
-              (blouseText.isEmpty ? sareeQty : 0.0))
+          ? (double.tryParse(blouseText) ?? 0.0)
           : 0.0;
 
       if (sareeSupplied <= 0 && laceSupplied <= 0 && blouseSupplied <= 0) {
@@ -135,6 +151,23 @@ class _CreateChallanScreenState extends ConsumerState<CreateChallanScreen> {
       _error = null;
     });
 
+    String? uploadedImageUrl;
+    if (_selectedImageBytes != null) {
+      try {
+        uploadedImageUrl = await ImageUploadHelper.uploadImage(
+          bytes: _selectedImageBytes!,
+          storageFolder: 'challans',
+        );
+      } catch (e) {
+        if (!mounted) return;
+        setState(() {
+          _isSubmitting = false;
+          _error = 'Failed to upload challan image: $e';
+        });
+        return;
+      }
+    }
+
     final repo = ref.read(challanRepositoryProvider);
     final result = await repo.createChallan(
       CreateChallanInput(
@@ -143,6 +176,7 @@ class _CreateChallanScreenState extends ConsumerState<CreateChallanScreen> {
         items: itemInputs,
         notes:
             _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+        imageUrl: uploadedImageUrl,
         creatorRole: isSupplier ? 'supplier' : 'admin',
       ),
     );
@@ -220,6 +254,7 @@ class _CreateChallanScreenState extends ConsumerState<CreateChallanScreen> {
                     notes: _notesCtrl.text.trim().isNotEmpty
                         ? _notesCtrl.text.trim()
                         : null,
+                    imageUrl: challan.imageUrl ?? uploadedImageUrl,
                     items: shareItems,
                   );
                   WhatsAppShareHelper.shareToWhatsApp(
@@ -460,6 +495,180 @@ class _CreateChallanScreenState extends ConsumerState<CreateChallanScreen> {
                                   prefixIcon: Icon(Icons.notes_outlined),
                                 ),
                               ),
+                              const SizedBox(height: 16),
+
+                              // Challan Photo / Bill Image Picker
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: Text(
+                                  'Challan Image / Bill Photo (Optional)',
+                                  style:
+                                      theme.textTheme.labelMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    color: Colors.grey.shade700,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              if (_selectedImageBytes == null)
+                                InkWell(
+                                  onTap: _pickImage,
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 18,
+                                      horizontal: 16,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      border: Border.all(
+                                        color: Colors.grey.shade300,
+                                        width: 1.2,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                      color: Colors.grey.shade50,
+                                    ),
+                                    child: Column(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Icon(
+                                          Icons.add_a_photo_outlined,
+                                          size: 28,
+                                          color: theme.colorScheme.primary,
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          'Attach Challan / Bill Photo',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            color: theme.colorScheme.primary,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Tap to take photo with camera or choose from gallery',
+                                          style: theme.textTheme.bodySmall
+                                              ?.copyWith(
+                                            color: Colors.grey.shade600,
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                )
+                              else
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    border: Border.all(
+                                      color: theme.colorScheme.primary
+                                          .withValues(alpha: 0.3),
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                    color: theme.colorScheme.primary
+                                        .withValues(alpha: 0.04),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      GestureDetector(
+                                        onTap: () {
+                                          ImageUploadHelper
+                                              .viewFullScreenImage(
+                                            context,
+                                            imageBytes: _selectedImageBytes,
+                                            title:
+                                                'Challan Attachment Preview',
+                                          );
+                                        },
+                                        child: ClipRRect(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                          child: Stack(
+                                            children: [
+                                              Image.memory(
+                                                _selectedImageBytes!,
+                                                width: 64,
+                                                height: 64,
+                                                fit: BoxFit.cover,
+                                              ),
+                                              Positioned(
+                                                bottom: 2,
+                                                right: 2,
+                                                child: Container(
+                                                  padding:
+                                                      const EdgeInsets.all(2),
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                    color: Colors.black54,
+                                                    shape: BoxShape.circle,
+                                                  ),
+                                                  child: const Icon(
+                                                    Icons.fullscreen,
+                                                    color: Colors.white,
+                                                    size: 14,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              _selectedImage?.name ??
+                                                  'Challan Image',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            const Text(
+                                              'Ready to upload on create. Tap image to zoom.',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: Colors.green,
+                                                fontWeight: FontWeight.w500,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.edit_outlined,
+                                          size: 20,
+                                        ),
+                                        tooltip: 'Change Photo',
+                                        onPressed: _pickImage,
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                          Icons.delete_outline,
+                                          color: Colors.red,
+                                          size: 20,
+                                        ),
+                                        tooltip: 'Remove Photo',
+                                        onPressed: () {
+                                          setState(() {
+                                            _selectedImage = null;
+                                            _selectedImageBytes = null;
+                                          });
+                                        },
+                                      ),
+                                    ],
+                                  ),
+                                ),
                             ],
                           ),
                         ),
@@ -587,29 +796,6 @@ class _ChallanItemCard extends ConsumerStatefulWidget {
 }
 
 class _ChallanItemCardState extends ConsumerState<_ChallanItemCard> {
-  void _onSareeQuantityChanged(String value) {
-    final qty = double.tryParse(value) ?? 0;
-    if (qty > 0) {
-      if (widget.draft.sareeSuppliedCtrl.text.isEmpty ||
-          widget.draft.sareeSuppliedCtrl.text == '0') {
-        widget.draft.sareeSuppliedCtrl.text = value;
-      }
-      if (widget.draft.selectedProduct?.requiresLace == true) {
-        if (widget.draft.laceSuppliedCtrl.text.isEmpty ||
-            widget.draft.laceSuppliedCtrl.text == '0') {
-          widget.draft.laceSuppliedCtrl.text = value;
-        }
-      }
-      if (widget.draft.selectedProduct?.requiresBlouse == true) {
-        if (widget.draft.blouseSuppliedCtrl.text.isEmpty ||
-            widget.draft.blouseSuppliedCtrl.text == '0') {
-          widget.draft.blouseSuppliedCtrl.text = value;
-        }
-      }
-    }
-    setState(() {});
-  }
-
   @override
   Widget build(BuildContext context) {
     final draft = widget.draft;
@@ -621,14 +807,12 @@ class _ChallanItemCardState extends ConsumerState<_ChallanItemCard> {
     final laceText = draft.laceSuppliedCtrl.text.trim();
     final blouseText = draft.blouseSuppliedCtrl.text.trim();
 
-    final sareeDelivered =
-        double.tryParse(sareeText) ?? (sareeText.isEmpty ? targetQty : 0.0);
+    final sareeDelivered = double.tryParse(sareeText) ?? 0.0;
     final laceDelivered = product?.requiresLace == true
-        ? (double.tryParse(laceText) ?? (laceText.isEmpty ? targetQty : 0.0))
+        ? (double.tryParse(laceText) ?? 0.0)
         : 0.0;
     final blouseDelivered = product?.requiresBlouse == true
-        ? (double.tryParse(blouseText) ??
-            (blouseText.isEmpty ? targetQty : 0.0))
+        ? (double.tryParse(blouseText) ?? 0.0)
         : 0.0;
 
     final sareeShortage =
@@ -738,7 +922,18 @@ class _ChallanItemCardState extends ConsumerState<_ChallanItemCard> {
                         items: activeSkus.map((sku) {
                           return DropdownMenuItem(
                             value: sku,
-                            child: Text('${sku.colorName} (${sku.sku})'),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                ProductColorDot(
+                                  colorCode: sku.colorCode,
+                                  colorName: sku.colorName,
+                                  size: 16,
+                                ),
+                                const SizedBox(width: 8),
+                                Text('${sku.colorName} (${sku.sku})'),
+                              ],
+                            ),
                           );
                         }).toList(),
                         onChanged: (sku) =>
@@ -874,6 +1069,7 @@ class _ChallanItemCardState extends ConsumerState<_ChallanItemCard> {
                 keyboardType: TextInputType.number,
                 decoration: const InputDecoration(
                   labelText: 'Saree Fabric Supplied',
+                  hintText: '0',
                   prefixIcon: Icon(Icons.layers_outlined),
                 ),
                 onChanged: (_) => setState(() {}),
@@ -887,6 +1083,7 @@ class _ChallanItemCardState extends ConsumerState<_ChallanItemCard> {
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
                     labelText: 'Lace Pieces Supplied',
+                    hintText: '0',
                     prefixIcon: Icon(Icons.content_cut_outlined),
                   ),
                   onChanged: (_) => setState(() {}),
@@ -918,6 +1115,7 @@ class _ChallanItemCardState extends ConsumerState<_ChallanItemCard> {
                   keyboardType: TextInputType.number,
                   decoration: const InputDecoration(
                     labelText: 'Blouse Pieces Supplied',
+                    hintText: '0',
                     prefixIcon: Icon(Icons.checkroom),
                   ),
                   onChanged: (_) => setState(() {}),

@@ -40,6 +40,7 @@ class WhatsAppShareHelper {
     required String supplierName,
     required String stitchingUserName,
     String? notes,
+    String? imageUrl,
     required List<ChallanItemShareData> items,
   }) {
     final dateStr = DateFormat('dd MMM yyyy, hh:mm a').format(createdAt);
@@ -53,6 +54,9 @@ class WhatsAppShareHelper {
     buffer.writeln('🪡 *Stitching Unit (Manufacturer):* $stitchingUserName');
     if (notes != null && notes.trim().isNotEmpty) {
       buffer.writeln('📝 *Notes:* ${notes.trim()}');
+    }
+    if (imageUrl != null && imageUrl.trim().isNotEmpty) {
+      buffer.writeln('📷 *Attachment:* ${imageUrl.trim()}');
     }
     buffer.writeln('━━━━━━━━━━━━━━━━━━━━');
     buffer.writeln('📦 *DISPATCHED ITEMS & MATERIALS:*');

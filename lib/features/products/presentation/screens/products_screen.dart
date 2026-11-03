@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:saree_sutra/core/widgets/async_state_widgets.dart';
+import 'package:saree_sutra/core/widgets/color_picker_dialog.dart';
+import 'package:saree_sutra/core/widgets/product_color_dot.dart';
 import 'package:saree_sutra/features/products/domain/product.dart';
 import 'package:saree_sutra/features/products/domain/product_sku.dart';
 import 'package:saree_sutra/features/products/presentation/controllers/product_providers.dart';
@@ -48,15 +50,20 @@ class _ProductsScreenState extends ConsumerState<ProductsScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.inventory_2_outlined,
-                      size: 48, color: Colors.grey,),
+                  const Icon(
+                    Icons.inventory_2_outlined,
+                    size: 48,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(height: 12),
-                  const Text('No Products Created',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),),
+                  const Text(
+                    'No Products Created',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                   const SizedBox(height: 4),
                   const Text(
-                      'Create products and color SKUs to start generating challans.',),
+                    'Create products and color SKUs to start generating challans.',
+                  ),
                   const SizedBox(height: 16),
                   FilledButton.icon(
                     onPressed: () => _showAddProductDialog(context),
@@ -239,32 +246,65 @@ class _ProductExpansionCard extends ConsumerWidget {
                   return ListTile(
                     dense: true,
                     contentPadding: EdgeInsets.zero,
-                    leading: CircleAvatar(
-                      radius: 12,
-                      backgroundColor:
-                          theme.colorScheme.primary.withValues(alpha: 0.15),
-                      child: Text(
-                        sku.colorName.isNotEmpty
-                            ? sku.colorName[0].toUpperCase()
-                            : '?',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
+                    leading: ProductColorDot(
+                      colorCode: sku.colorCode,
+                      colorName: sku.colorName,
+                      size: 24,
                     ),
-                    title: Text('${sku.colorName} (${sku.sku})'),
+                    title: Row(
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '${sku.colorName} (${sku.sku})',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                        if (sku.colorCode != null &&
+                            sku.colorCode!.trim().isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 1.5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: Text(
+                              sku.colorCode!,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Colors.grey.shade700,
+                                fontFamily: 'monospace',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     subtitle: Text('Variant key: ${sku.variantKey}'),
-                    trailing: Switch.adaptive(
-                      value: sku.isActive,
-                      onChanged: (active) {
-                        ref.read(productRepositoryProvider).toggleSkuStatus(
-                              productId: product.productId,
-                              sku: sku.sku,
-                              isActive: active,
-                            );
-                      },
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.palette_outlined, size: 18),
+                          tooltip: 'Edit Color / SKU',
+                          onPressed: () =>
+                              _showEditSkuDialog(context, ref, sku),
+                        ),
+                        Switch.adaptive(
+                          value: sku.isActive,
+                          onChanged: (active) {
+                            ref.read(productRepositoryProvider).toggleSkuStatus(
+                                  productId: product.productId,
+                                  sku: sku.sku,
+                                  isActive: active,
+                                );
+                          },
+                        ),
+                      ],
                     ),
                   );
                 },
@@ -281,6 +321,20 @@ class _ProductExpansionCard extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (_) => _AddSkuDialog(productId: product.productId),
+    );
+  }
+
+  void _showEditSkuDialog(
+    BuildContext context,
+    WidgetRef ref,
+    ProductSku sku,
+  ) {
+    showDialog(
+      context: context,
+      builder: (_) => _EditSkuDialog(
+        product: product,
+        sku: sku,
+      ),
     );
   }
 
@@ -341,9 +395,10 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
   bool _requiresLace = true;
   bool _requiresBlouse = true;
 
-  final List<Map<String, String>> _initialSkus = [];
+  final List<Map<String, String?>> _initialSkus = [];
   final _skuCodeCtrl = TextEditingController();
   final _skuColorCtrl = TextEditingController();
+  String? _draftColorCode;
 
   bool _isLoading = false;
   String? _error;
@@ -363,9 +418,14 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
     final color = _skuColorCtrl.text.trim();
     if (code.isEmpty || color.isEmpty) return;
     setState(() {
-      _initialSkus.add({'sku': code, 'colorName': color});
+      _initialSkus.add({
+        'sku': code,
+        'colorName': color,
+        'colorCode': _draftColorCode,
+      });
       _skuCodeCtrl.clear();
       _skuColorCtrl.clear();
+      _draftColorCode = null;
     });
   }
 
@@ -382,6 +442,7 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
         productId: '',
         sku: e['sku']!,
         colorName: e['colorName']!,
+        colorCode: e['colorCode'],
         isActive: true,
       );
     }).toList();
@@ -403,7 +464,8 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Product "${product.name}" created successfully'),),
+            content: Text('Product "${product.name}" created successfully'),
+          ),
         );
       },
       failure: (err) {
@@ -433,8 +495,10 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                     padding: const EdgeInsets.all(8),
                     margin: const EdgeInsets.only(bottom: 12),
                     color: Colors.red.shade50,
-                    child: Text(_error!,
-                        style: const TextStyle(color: Colors.red),),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ),
                 TextFormField(
                   controller: _nameCtrl,
@@ -479,7 +543,9 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                           style: OutlinedButton.styleFrom(
                             visualDensity: VisualDensity.compact,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4,),
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                           ),
                           onPressed: () {
                             setState(() {
@@ -488,15 +554,19 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                               _requiresBlouse = false;
                             });
                           },
-                          child: const Text('Only Raw Saree',
-                              style: TextStyle(fontSize: 11),),
+                          child: const Text(
+                            'Only Raw Saree',
+                            style: TextStyle(fontSize: 11),
+                          ),
                         ),
                         const SizedBox(width: 6),
                         TextButton(
                           style: TextButton.styleFrom(
                             visualDensity: VisualDensity.compact,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4,),
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                           ),
                           onPressed: () {
                             setState(() {
@@ -505,8 +575,10 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                               _requiresBlouse = true;
                             });
                           },
-                          child: const Text('All Materials',
-                              style: TextStyle(fontSize: 11),),
+                          child: const Text(
+                            'All Materials',
+                            style: TextStyle(fontSize: 11),
+                          ),
                         ),
                       ],
                     ),
@@ -525,7 +597,8 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Requires Lace Material'),
                   subtitle: const Text(
-                      'Uncheck if this saree type does not use lace',),
+                    'Uncheck if this saree type does not use lace',
+                  ),
                   value: _requiresLace,
                   onChanged: (v) => setState(() => _requiresLace = v ?? true),
                 ),
@@ -534,7 +607,8 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Requires Blouse Material'),
                   subtitle: const Text(
-                      'Uncheck if this saree type does not use blouse piece',),
+                    'Uncheck if this saree type does not use blouse piece',
+                  ),
                   value: _requiresBlouse,
                   onChanged: (v) => setState(() => _requiresBlouse = v ?? true),
                 ),
@@ -567,12 +641,61 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                         ),
                       ),
                     ),
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: ProductColorDot(
+                        colorCode: _draftColorCode,
+                        colorName: _skuColorCtrl.text,
+                        size: 24,
+                      ),
+                      tooltip: _draftColorCode != null
+                          ? 'Color: $_draftColorCode (Tap to change)'
+                          : 'Pick Color (Optional)',
+                      onPressed: () async {
+                        final picked = await showColorPickerDialog(
+                          context,
+                          initialColorCode: _draftColorCode,
+                          colorName: _skuColorCtrl.text,
+                        );
+                        if (picked != null) {
+                          setState(() {
+                            _draftColorCode = picked.isEmpty ? null : picked;
+                          });
+                        }
+                      },
+                    ),
                     IconButton(
                       icon: const Icon(Icons.add_circle, color: Colors.blue),
+                      tooltip: 'Add SKU Variant',
                       onPressed: _addSkuToDraft,
                     ),
                   ],
                 ),
+                if (_draftColorCode != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Color: $_draftColorCode',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.grey.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        GestureDetector(
+                          onTap: () => setState(() => _draftColorCode = null),
+                          child: const Icon(
+                            Icons.close,
+                            size: 14,
+                            color: Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 if (_initialSkus.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
@@ -580,6 +703,11 @@ class _AddProductDialogState extends ConsumerState<_AddProductDialog> {
                       spacing: 6,
                       children: _initialSkus.map((sku) {
                         return Chip(
+                          avatar: ProductColorDot(
+                            colorCode: sku['colorCode'],
+                            colorName: sku['colorName'],
+                            size: 16,
+                          ),
                           label: Text('${sku['colorName']} (${sku['sku']})'),
                           onDeleted: () =>
                               setState(() => _initialSkus.remove(sku)),
@@ -624,6 +752,7 @@ class _AddSkuDialog extends ConsumerStatefulWidget {
 class _AddSkuDialogState extends ConsumerState<_AddSkuDialog> {
   final _skuCtrl = TextEditingController();
   final _colorCtrl = TextEditingController();
+  String? _selectedColorCode;
   bool _isLoading = false;
   String? _error;
 
@@ -652,6 +781,7 @@ class _AddSkuDialogState extends ConsumerState<_AddSkuDialog> {
       productId: widget.productId,
       sku: sku,
       colorName: color,
+      colorCode: _selectedColorCode,
     );
 
     if (!mounted) return;
@@ -672,6 +802,7 @@ class _AddSkuDialogState extends ConsumerState<_AddSkuDialog> {
       title: const Text('Add Color SKU'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_error != null)
             Padding(
@@ -692,6 +823,14 @@ class _AddSkuDialogState extends ConsumerState<_AddSkuDialog> {
               labelText: 'Color Name *',
               hintText: 'e.g. Ruby Red, Sky Blue',
             ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 14),
+          ColorPickerField(
+            colorCode: _selectedColorCode,
+            colorName: _colorCtrl.text,
+            label: 'Variant Swatch Color (Optional)',
+            onColorChanged: (code) => setState(() => _selectedColorCode = code),
           ),
         ],
       ),
@@ -810,8 +949,10 @@ class _EditProductDialogState extends ConsumerState<_EditProductDialog> {
                     padding: const EdgeInsets.all(8),
                     margin: const EdgeInsets.only(bottom: 12),
                     color: Colors.red.shade50,
-                    child: Text(_error!,
-                        style: const TextStyle(color: Colors.red),),
+                    child: Text(
+                      _error!,
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   ),
                 TextFormField(
                   controller: _nameCtrl,
@@ -854,7 +995,9 @@ class _EditProductDialogState extends ConsumerState<_EditProductDialog> {
                           style: OutlinedButton.styleFrom(
                             visualDensity: VisualDensity.compact,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4,),
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                           ),
                           onPressed: () {
                             setState(() {
@@ -863,15 +1006,19 @@ class _EditProductDialogState extends ConsumerState<_EditProductDialog> {
                               _requiresBlouse = false;
                             });
                           },
-                          child: const Text('Only Raw Saree',
-                              style: TextStyle(fontSize: 11),),
+                          child: const Text(
+                            'Only Raw Saree',
+                            style: TextStyle(fontSize: 11),
+                          ),
                         ),
                         const SizedBox(width: 6),
                         TextButton(
                           style: TextButton.styleFrom(
                             visualDensity: VisualDensity.compact,
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4,),
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                           ),
                           onPressed: () {
                             setState(() {
@@ -880,8 +1027,10 @@ class _EditProductDialogState extends ConsumerState<_EditProductDialog> {
                               _requiresBlouse = true;
                             });
                           },
-                          child: const Text('All Materials',
-                              style: TextStyle(fontSize: 11),),
+                          child: const Text(
+                            'All Materials',
+                            style: TextStyle(fontSize: 11),
+                          ),
                         ),
                       ],
                     ),
@@ -900,7 +1049,8 @@ class _EditProductDialogState extends ConsumerState<_EditProductDialog> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Requires Lace Material'),
                   subtitle: const Text(
-                      'Uncheck if this saree type does not use lace',),
+                    'Uncheck if this saree type does not use lace',
+                  ),
                   value: _requiresLace,
                   onChanged: (v) => setState(() => _requiresLace = v ?? true),
                 ),
@@ -909,7 +1059,8 @@ class _EditProductDialogState extends ConsumerState<_EditProductDialog> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Requires Blouse Material'),
                   subtitle: const Text(
-                      'Uncheck if this saree type does not use blouse piece',),
+                    'Uncheck if this saree type does not use blouse piece',
+                  ),
                   value: _requiresBlouse,
                   onChanged: (v) => setState(() => _requiresBlouse = v ?? true),
                 ),
@@ -917,6 +1068,138 @@ class _EditProductDialogState extends ConsumerState<_EditProductDialog> {
             ),
           ),
         ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _isLoading ? null : _submit,
+          child: _isLoading
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Save Changes'),
+        ),
+      ],
+    );
+  }
+}
+
+class _EditSkuDialog extends ConsumerStatefulWidget {
+  const _EditSkuDialog({
+    required this.product,
+    required this.sku,
+  });
+
+  final Product product;
+  final ProductSku sku;
+
+  @override
+  ConsumerState<_EditSkuDialog> createState() => _EditSkuDialogState();
+}
+
+class _EditSkuDialogState extends ConsumerState<_EditSkuDialog> {
+  late final TextEditingController _colorCtrl;
+  String? _selectedColorCode;
+  bool _isLoading = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _colorCtrl = TextEditingController(text: widget.sku.colorName);
+    _selectedColorCode = widget.sku.colorCode;
+  }
+
+  @override
+  void dispose() {
+    _colorCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    final color = _colorCtrl.text.trim();
+    if (color.isEmpty) {
+      setState(() => _error = 'Color Name is required');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
+    final repo = ref.read(productRepositoryProvider);
+    final result = await repo.updateProductSku(
+      productId: widget.product.productId,
+      sku: widget.sku.sku,
+      colorName: color,
+      colorCode: _selectedColorCode,
+    );
+
+    if (!mounted) return;
+    result.when(
+      success: (_) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Color SKU "${widget.sku.sku}" updated successfully',
+            ),
+          ),
+        );
+      },
+      failure: (err) {
+        setState(() {
+          _error = err.message;
+          _isLoading = false;
+        });
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Edit Color SKU: ${widget.sku.sku}'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Text(_error!, style: const TextStyle(color: Colors.red)),
+            ),
+          Text(
+            'Product: ${widget.product.name} (${widget.product.productCode})',
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey.shade700,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _colorCtrl,
+            decoration: const InputDecoration(
+              labelText: 'Color Name *',
+              hintText: 'e.g. Ruby Red, Sky Blue',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 14),
+          ColorPickerField(
+            colorCode: _selectedColorCode,
+            colorName: _colorCtrl.text,
+            label: 'Variant Swatch Color (Optional)',
+            onColorChanged: (code) => setState(() => _selectedColorCode = code),
+          ),
+        ],
       ),
       actions: [
         TextButton(

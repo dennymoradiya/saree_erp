@@ -38,6 +38,7 @@ mixin _$Challan {
   @TimestampConverter()
   DateTime get updatedAt => throw _privateConstructorUsedError;
   String? get notes => throw _privateConstructorUsedError;
+  String? get imageUrl => throw _privateConstructorUsedError;
   String? get cancelledReason => throw _privateConstructorUsedError;
   String? get cancelledBy => throw _privateConstructorUsedError;
   @NullableTimestampConverter()
@@ -70,6 +71,7 @@ abstract class $ChallanCopyWith<$Res> {
       @TimestampConverter() DateTime createdAt,
       @TimestampConverter() DateTime updatedAt,
       String? notes,
+      String? imageUrl,
       String? cancelledReason,
       String? cancelledBy,
       @NullableTimestampConverter() DateTime? cancelledAt});
@@ -101,6 +103,7 @@ class _$ChallanCopyWithImpl<$Res, $Val extends Challan>
     Object? createdAt = null,
     Object? updatedAt = null,
     Object? notes = freezed,
+    Object? imageUrl = freezed,
     Object? cancelledReason = freezed,
     Object? cancelledBy = freezed,
     Object? cancelledAt = freezed,
@@ -150,6 +153,10 @@ class _$ChallanCopyWithImpl<$Res, $Val extends Challan>
           ? _value.notes
           : notes // ignore: cast_nullable_to_non_nullable
               as String?,
+      imageUrl: freezed == imageUrl
+          ? _value.imageUrl
+          : imageUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
       cancelledReason: freezed == cancelledReason
           ? _value.cancelledReason
           : cancelledReason // ignore: cast_nullable_to_non_nullable
@@ -186,6 +193,7 @@ abstract class _$$ChallanImplCopyWith<$Res> implements $ChallanCopyWith<$Res> {
       @TimestampConverter() DateTime createdAt,
       @TimestampConverter() DateTime updatedAt,
       String? notes,
+      String? imageUrl,
       String? cancelledReason,
       String? cancelledBy,
       @NullableTimestampConverter() DateTime? cancelledAt});
@@ -215,6 +223,7 @@ class __$$ChallanImplCopyWithImpl<$Res>
     Object? createdAt = null,
     Object? updatedAt = null,
     Object? notes = freezed,
+    Object? imageUrl = freezed,
     Object? cancelledReason = freezed,
     Object? cancelledBy = freezed,
     Object? cancelledAt = freezed,
@@ -264,6 +273,10 @@ class __$$ChallanImplCopyWithImpl<$Res>
           ? _value.notes
           : notes // ignore: cast_nullable_to_non_nullable
               as String?,
+      imageUrl: freezed == imageUrl
+          ? _value.imageUrl
+          : imageUrl // ignore: cast_nullable_to_non_nullable
+              as String?,
       cancelledReason: freezed == cancelledReason
           ? _value.cancelledReason
           : cancelledReason // ignore: cast_nullable_to_non_nullable
@@ -296,6 +309,7 @@ class _$ChallanImpl implements _Challan {
       @TimestampConverter() required this.createdAt,
       @TimestampConverter() required this.updatedAt,
       this.notes,
+      this.imageUrl,
       this.cancelledReason,
       this.cancelledBy,
       @NullableTimestampConverter() this.cancelledAt});
@@ -333,6 +347,8 @@ class _$ChallanImpl implements _Challan {
   @override
   final String? notes;
   @override
+  final String? imageUrl;
+  @override
   final String? cancelledReason;
   @override
   final String? cancelledBy;
@@ -342,7 +358,7 @@ class _$ChallanImpl implements _Challan {
 
   @override
   String toString() {
-    return 'Challan(challanId: $challanId, challanNumber: $challanNumber, supplierId: $supplierId, stitchingUserId: $stitchingUserId, createdBy: $createdBy, createdByRole: $createdByRole, status: $status, issuedAt: $issuedAt, createdAt: $createdAt, updatedAt: $updatedAt, notes: $notes, cancelledReason: $cancelledReason, cancelledBy: $cancelledBy, cancelledAt: $cancelledAt)';
+    return 'Challan(challanId: $challanId, challanNumber: $challanNumber, supplierId: $supplierId, stitchingUserId: $stitchingUserId, createdBy: $createdBy, createdByRole: $createdByRole, status: $status, issuedAt: $issuedAt, createdAt: $createdAt, updatedAt: $updatedAt, notes: $notes, imageUrl: $imageUrl, cancelledReason: $cancelledReason, cancelledBy: $cancelledBy, cancelledAt: $cancelledAt)';
   }
 
   @override
@@ -370,6 +386,8 @@ class _$ChallanImpl implements _Challan {
             (identical(other.updatedAt, updatedAt) ||
                 other.updatedAt == updatedAt) &&
             (identical(other.notes, notes) || other.notes == notes) &&
+            (identical(other.imageUrl, imageUrl) ||
+                other.imageUrl == imageUrl) &&
             (identical(other.cancelledReason, cancelledReason) ||
                 other.cancelledReason == cancelledReason) &&
             (identical(other.cancelledBy, cancelledBy) ||
@@ -393,6 +411,7 @@ class _$ChallanImpl implements _Challan {
       createdAt,
       updatedAt,
       notes,
+      imageUrl,
       cancelledReason,
       cancelledBy,
       cancelledAt);
@@ -427,6 +446,7 @@ abstract class _Challan implements Challan {
           @TimestampConverter() required final DateTime createdAt,
           @TimestampConverter() required final DateTime updatedAt,
           final String? notes,
+          final String? imageUrl,
           final String? cancelledReason,
           final String? cancelledBy,
           @NullableTimestampConverter() final DateTime? cancelledAt}) =
@@ -463,6 +483,8 @@ abstract class _Challan implements Challan {
   DateTime get updatedAt;
   @override
   String? get notes;
+  @override
+  String? get imageUrl;
   @override
   String? get cancelledReason;
   @override

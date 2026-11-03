@@ -41,6 +41,11 @@ abstract interface class ChallanRepository {
     required String reason,
   });
 
+  Future<Result<void>> updateChallanImage({
+    required String challanId,
+    required String? imageUrl,
+  });
+
   Stream<List<ChallanItem>> watchPendingStitchingItems({
     String? stitchingUserId,
   });

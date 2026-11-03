@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:saree_sutra/core/widgets/product_color_dot.dart';
 import 'package:saree_sutra/features/challans/domain/challan.dart';
 import 'package:saree_sutra/features/challans/domain/challan_item.dart';
 import 'package:saree_sutra/features/challans/presentation/controllers/challan_providers.dart';
@@ -171,9 +172,21 @@ class _FulfillSupplierMaterialDialogState
                       item.productNameSnapshot,
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    Text(
-                      'SKU: ${item.skuSnapshot} ${item.colorNameSnapshot != null ? "(${item.colorNameSnapshot})" : ""}',
-                      style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                    Row(
+                      children: [
+                        ProductColorDot(
+                          colorName: item.colorNameSnapshot,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'SKU: ${item.skuSnapshot} ${item.colorNameSnapshot != null ? "(${item.colorNameSnapshot})" : ""}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
