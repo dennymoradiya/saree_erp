@@ -48,4 +48,46 @@ firebase deploy --only firestore:rules,firestore:indexes
 ```bash
 firebase emulators:start --only auth,firestore
 ```
+
+### 5. Firebase Storage uploads from Netlify
+
+`storage.cors.json` allows the production origin `https://sareesutra.netlify.app`
+to access the storage bucket. CORS must be configured on Google Cloud Storage;
+Netlify response headers do not control requests to `firebasestorage.googleapis.com`.
+Deploying this repository or running `firebase deploy` does not apply this policy.
+
+First open Firebase Console → project `saree-sutra` → Storage and confirm that
+Storage is initialized and the bucket is `saree-sutra.firebasestorage.app`.
+Complete any required billing/setup steps shown by Firebase. If the console
+shows a different bucket, update the `storageBucket` entries in
+`lib/firebase_options.dart` and use that bucket in the commands below.
+
+From Google Cloud Shell, or a local Google Cloud CLI authenticated as an account
+with permission to update the bucket, run these commands from the repository:
+
+```bash
+gcloud storage buckets describe gs://saree-sutra.firebasestorage.app
+gcloud storage buckets update gs://saree-sutra.firebasestorage.app --cors-file=storage.cors.json
+gcloud storage buckets describe gs://saree-sutra.firebasestorage.app --format="default(cors_config)"
+```
+
+The update replaces the bucket's existing CORS policy. If other web applications
+use this bucket, retain their origins in `storage.cors.json` before applying it.
+The policy does not change Firebase Storage authorization: users must still
+sign in and satisfy `storage.rules`.
+
+To check the upload preflight without uploading a file:
+
+```bash
+curl -i -X OPTIONS \
+  'https://firebasestorage.googleapis.com/v0/b/saree-sutra.firebasestorage.app/o?name=challans%2Fcors-check.jpg' \
+  -H 'Origin: https://sareesutra.netlify.app' \
+  -H 'Access-Control-Request-Method: POST' \
+  -H 'Access-Control-Request-Headers: authorization,content-type,x-firebase-storage-version,x-goog-upload-protocol,x-goog-upload-command,x-goog-upload-header-content-length,x-goog-upload-header-content-type'
+```
+
+Expect a successful HTTP status and an `Access-Control-Allow-Origin` header
+allowing the site. A 404 preflight can indicate an unavailable or incorrect
+bucket; adding CORS alone does not fix that. After resolving the bucket setup,
+retry a challan image upload while signed in.
 # saree_erp

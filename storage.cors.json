@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["https://sareesutra.netlify.app"],
+    "method": ["GET", "HEAD", "POST", "PUT", "DELETE"],
+    "responseHeader": ["Content-Type", "Content-Range", "ETag"],
+    "maxAgeSeconds": 3600
+  }
+]
