@@ -3,6 +3,7 @@ import 'package:saree_sutra/core/utils/result.dart';
 import 'package:saree_sutra/features/challans/domain/challan.dart';
 import 'package:saree_sutra/features/challans/domain/challan_item.dart';
 import 'package:saree_sutra/features/challans/domain/create_challan_input.dart';
+import 'package:saree_sutra/features/challans/domain/edit_challan_input.dart';
 import 'package:saree_sutra/features/transactions/domain/material_transaction.dart';
 import 'package:saree_sutra/features/transactions/domain/supplier_material_transaction.dart';
 
@@ -44,6 +45,12 @@ abstract interface class ChallanRepository {
   Future<Result<void>> updateChallanImage({
     required String challanId,
     required String? imageUrl,
+  });
+
+  Future<Result<void>> updateChallan({
+    required String challanId,
+    String? notes,
+    required List<ChallanItemEdit> itemEdits,
   });
 
   Stream<List<ChallanItem>> watchPendingStitchingItems({

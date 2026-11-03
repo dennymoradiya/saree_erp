@@ -8,6 +8,9 @@ enum AuditAction {
   @JsonValue('CHALLAN_CANCELLED')
   challanCancelled('CHALLAN_CANCELLED'),
 
+  @JsonValue('CHALLAN_UPDATED')
+  challanUpdated('CHALLAN_UPDATED'),
+
   @JsonValue('SUPPLIER_MATERIAL_RECEIVED')
   supplierMaterialReceived('SUPPLIER_MATERIAL_RECEIVED'),
 

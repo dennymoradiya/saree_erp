@@ -7,6 +7,7 @@ import 'package:saree_sutra/core/enums/allocation_type.dart';
 import 'package:saree_sutra/core/enums/audit_action.dart';
 import 'package:saree_sutra/core/enums/challan_status.dart';
 import 'package:saree_sutra/core/enums/material_type.dart';
+import 'package:saree_sutra/core/enums/transaction_type.dart';
 import 'package:saree_sutra/core/errors/app_exception.dart';
 import 'package:saree_sutra/core/utils/firestore_exception_mapper.dart';
 import 'package:saree_sutra/core/utils/result.dart';
@@ -14,6 +15,7 @@ import 'package:saree_sutra/features/challans/domain/challan.dart';
 import 'package:saree_sutra/features/challans/domain/challan_item.dart';
 import 'package:saree_sutra/features/challans/domain/challan_repository.dart';
 import 'package:saree_sutra/features/challans/domain/create_challan_input.dart';
+import 'package:saree_sutra/features/challans/domain/edit_challan_input.dart';
 import 'package:saree_sutra/features/transactions/domain/material_transaction.dart';
 import 'package:saree_sutra/features/transactions/domain/supplier_material_transaction.dart';
 
@@ -726,6 +728,237 @@ class FirebaseChallanRepository implements ChallanRepository {
     } catch (e) {
       return Failure(mapFirebaseError(e));
     }
+  }
+
+  @override
+  Future<Result<void>> updateChallan({
+    required String challanId,
+    String? notes,
+    required List<ChallanItemEdit> itemEdits,
+  }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) {
+      return const Failure(PermissionDeniedException('Sign in required.'));
+    }
+
+    if (itemEdits.isEmpty) {
+      return const Failure(
+        UnknownAppException('At least one challan item is required.'),
+      );
+    }
+
+    for (final edit in itemEdits) {
+      if (edit.sareeIssuedQuantity < 0 || edit.sareeReturnedQuantity < 0) {
+        return const Failure(
+          LedgerViolationException('Quantities cannot be negative.'),
+        );
+      }
+      if (edit.sareeReturnedQuantity > edit.sareeIssuedQuantity) {
+        return const Failure(
+          LedgerViolationException(
+            'Deposit / returned quantity cannot exceed issued quantity.',
+          ),
+        );
+      }
+    }
+
+    try {
+      final challanRef =
+          _firestore.collection(FirestorePaths.challans).doc(challanId);
+      final itemsSnap = await _firestore
+          .collection(FirestorePaths.challanItems)
+          .where('challanId', isEqualTo: challanId)
+          .get();
+
+      if (itemsSnap.docs.isEmpty) {
+        return const Failure(NotFoundException('Challan items not found.'));
+      }
+
+      final editsById = {for (final e in itemEdits) e.challanItemId: e};
+
+      await _firestore.runTransaction((tx) async {
+        final now = FieldValue.serverTimestamp();
+        final challanSnap = await tx.get(challanRef);
+        if (!challanSnap.exists) {
+          throw const NotFoundException('Challan not found.');
+        }
+
+        final challanData = challanSnap.data()!;
+        final currentStatus = challanData['status'] as String?;
+        if (currentStatus == ChallanStatus.cancelled.value) {
+          throw const LedgerViolationException(
+            'Cannot edit a cancelled challan.',
+          );
+        }
+
+        final stitchingUserId = challanData['stitchingUserId'] as String? ?? '';
+        final itemSnaps = <String, DocumentSnapshot<Map<String, dynamic>>>{};
+        for (final doc in itemsSnap.docs) {
+          itemSnaps[doc.id] = await tx.get(doc.reference);
+        }
+
+        final itemUpdates =
+            <DocumentReference<Map<String, dynamic>>, Map<String, dynamic>>{};
+        final returnTxs = <Map<String, dynamic>>[];
+        final itemAudit = <Map<String, dynamic>>[];
+        var anyPending = false;
+        var anyReturned = false;
+
+        for (final entry in itemSnaps.entries) {
+          final itemDoc = entry.value;
+          if (!itemDoc.exists) continue;
+          final data = itemDoc.data()!;
+          final edit = editsById[itemDoc.id];
+
+          final oldIssued =
+              (data['sareeIssuedQuantity'] as num? ?? 0).toDouble();
+          final oldReturned =
+              (data['sareeReturnedQuantity'] as num? ?? 0).toDouble();
+          final newIssued = edit?.sareeIssuedQuantity ?? oldIssued;
+          final newReturned = edit?.sareeReturnedQuantity ?? oldReturned;
+          final newPending = max(0.0, newIssued - newReturned);
+
+          if (newPending > 0) anyPending = true;
+          if (newReturned > 0) anyReturned = true;
+
+          if (edit == null) continue;
+
+          final fields = <String, dynamic>{
+            'sareeIssuedQuantity': newIssued,
+            'sareeReturnedQuantity': newReturned,
+            'sareePendingQuantity': newPending,
+            'stitchingReturnedQuantity': newReturned,
+            'updatedAt': now,
+          };
+
+          _syncRequiredWithIssued(
+            fields: fields,
+            data: data,
+            oldIssued: oldIssued,
+            newIssued: newIssued,
+          );
+
+          itemUpdates[itemDoc.reference] = fields;
+
+          final returnedDelta = newReturned - oldReturned;
+          if (returnedDelta.abs() > 0.0001) {
+            final txRef = _firestore
+                .collection(FirestorePaths.materialTransactions)
+                .doc();
+            returnTxs.add({
+              'ref': txRef,
+              'data': {
+                'transactionId': txRef.id,
+                'stitchingUserId': stitchingUserId,
+                'productId': data['productId'],
+                'sku': data['sku'],
+                'challanId': challanId,
+                'challanItemId': itemDoc.id,
+                'quantity': returnedDelta,
+                'type': TransactionType.stitchingReturn.value,
+                'createdBy': currentUser.uid,
+                'createdByRole': 'admin',
+                'notes': returnedDelta > 0
+                    ? 'Admin correction: increased deposit qty'
+                    : 'Admin correction: reduced deposit qty',
+              },
+            });
+          }
+
+          itemAudit.add({
+            'challanItemId': itemDoc.id,
+            'sku': data['sku'],
+            'beforeIssued': oldIssued,
+            'afterIssued': newIssued,
+            'beforeReturned': oldReturned,
+            'afterReturned': newReturned,
+          });
+        }
+
+        final newStatus = !anyPending
+            ? ChallanStatus.completed.value
+            : anyReturned
+                ? ChallanStatus.partiallyCompleted.value
+                : ChallanStatus.issued.value;
+
+        for (final entry in itemUpdates.entries) {
+          tx.update(entry.key, entry.value);
+        }
+
+        for (final matTx in returnTxs) {
+          final txRef = matTx['ref'] as DocumentReference<Map<String, dynamic>>;
+          final data = matTx['data'] as Map<String, dynamic>;
+          tx.set(txRef, {
+            ...data,
+            'createdAt': now,
+          });
+        }
+
+        tx.update(challanRef, {
+          'notes': notes?.trim().isNotEmpty == true ? notes!.trim() : null,
+          'status': newStatus,
+          'updatedAt': now,
+        });
+
+        final auditRef = _firestore.collection(FirestorePaths.auditLogs).doc();
+        tx.set(auditRef, {
+          'logId': auditRef.id,
+          'action': AuditAction.challanUpdated.value,
+          'actorId': currentUser.uid,
+          'actorRole': 'admin',
+          'entityType': 'challan',
+          'entityId': challanId,
+          'beforeData': {
+            'status': currentStatus,
+            'notes': challanData['notes'],
+          },
+          'afterData': {
+            'status': newStatus,
+            'notes': notes?.trim(),
+            'items': itemAudit,
+          },
+          'createdAt': now,
+        });
+      });
+
+      return const Success(null);
+    } catch (e) {
+      return Failure(mapFirebaseError(e));
+    }
+  }
+
+  void _syncRequiredWithIssued({
+    required Map<String, dynamic> fields,
+    required Map<String, dynamic> data,
+    required double oldIssued,
+    required double newIssued,
+  }) {
+    if ((newIssued - oldIssued).abs() < 0.0001) return;
+
+    void sync(String requiredKey, String suppliedKey, String pendingKey) {
+      final oldRequired = (data[requiredKey] as num? ?? 0).toDouble();
+      if (oldRequired <= 0) return;
+      if ((oldRequired - oldIssued).abs() > 0.0001) return;
+      final supplied = (data[suppliedKey] as num? ?? 0).toDouble();
+      fields[requiredKey] = newIssued;
+      fields[pendingKey] = max(0.0, newIssued - supplied);
+    }
+
+    sync(
+      'sareeRequiredQuantity',
+      'sareeSuppliedQuantity',
+      'sareePendingSupplierQuantity',
+    );
+    sync(
+      'laceRequiredQuantity',
+      'laceSuppliedQuantity',
+      'lacePendingSupplierQuantity',
+    );
+    sync(
+      'blouseRequiredQuantity',
+      'blouseSuppliedQuantity',
+      'blousePendingSupplierQuantity',
+    );
   }
 }
 

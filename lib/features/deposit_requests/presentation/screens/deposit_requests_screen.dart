@@ -422,6 +422,7 @@ class _ManualReturnDialogState extends ConsumerState<ManualReturnDialog> {
   StitchingUserProfile? _selectedUser;
   Product? _selectedProduct;
   ProductSku? _selectedSku;
+  DateTime _occurredAt = DateTime.now();
 
   bool _isLoading = false;
   String? _error;
@@ -502,6 +503,7 @@ class _ManualReturnDialogState extends ConsumerState<ManualReturnDialog> {
       sku: _selectedSku!.sku,
       returnQuantity: qty,
       notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
+      occurredAt: _occurredAt,
     );
 
     if (!mounted) return;
@@ -521,6 +523,34 @@ class _ManualReturnDialogState extends ConsumerState<ManualReturnDialog> {
         });
       },
     );
+  }
+
+  Future<void> _pickOccurredAt() async {
+    final now = DateTime.now();
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _occurredAt.isAfter(now) ? now : _occurredAt,
+      firstDate: DateTime(2020),
+      lastDate: now,
+    );
+    if (pickedDate == null || !mounted) return;
+
+    final pickedTime = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_occurredAt),
+    );
+    if (!mounted) return;
+
+    final combined = DateTime(
+      pickedDate.year,
+      pickedDate.month,
+      pickedDate.day,
+      pickedTime?.hour ?? _occurredAt.hour,
+      pickedTime?.minute ?? _occurredAt.minute,
+    );
+    setState(() {
+      _occurredAt = combined.isAfter(now) ? now : combined;
+    });
   }
 
   @override
@@ -623,6 +653,19 @@ class _ManualReturnDialogState extends ConsumerState<ManualReturnDialog> {
                       );
                     },
                   ),
+                const SizedBox(height: 12),
+                InkWell(
+                  onTap: _isLoading ? null : _pickOccurredAt,
+                  child: InputDecorator(
+                    decoration: const InputDecoration(
+                      labelText: 'Return Date & Time *',
+                      suffixIcon: Icon(Icons.calendar_month),
+                    ),
+                    child: Text(
+                      DateFormat('dd MMM yyyy, hh:mm a').format(_occurredAt),
+                    ),
+                  ),
+                ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _qtyCtrl,

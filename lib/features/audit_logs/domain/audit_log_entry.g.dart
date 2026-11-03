@@ -37,6 +37,7 @@ Map<String, dynamic> _$$AuditLogEntryImplToJson(_$AuditLogEntryImpl instance) =>
 const _$AuditActionEnumMap = {
   AuditAction.challanCreated: 'CHALLAN_CREATED',
   AuditAction.challanCancelled: 'CHALLAN_CANCELLED',
+  AuditAction.challanUpdated: 'CHALLAN_UPDATED',
   AuditAction.supplierMaterialReceived: 'SUPPLIER_MATERIAL_RECEIVED',
   AuditAction.supplierPendingAllocated: 'SUPPLIER_PENDING_ALLOCATED',
   AuditAction.depositRequestCreated: 'DEPOSIT_REQUEST_CREATED',

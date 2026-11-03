@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import 'package:saree_sutra/core/enums/allocation_type.dart';
 import 'package:saree_sutra/core/enums/challan_status.dart';
 import 'package:saree_sutra/core/enums/material_type.dart';
+import 'package:saree_sutra/core/enums/user_role.dart';
+import 'package:saree_sutra/features/auth/presentation/controllers/auth_providers.dart';
 import 'package:saree_sutra/core/utils/image_upload_helper.dart';
 import 'package:saree_sutra/core/utils/whatsapp_share_helper.dart';
 import 'package:saree_sutra/core/widgets/async_state_widgets.dart';
@@ -12,6 +14,7 @@ import 'package:saree_sutra/core/widgets/product_color_dot.dart';
 import 'package:saree_sutra/features/challans/domain/challan.dart';
 import 'package:saree_sutra/features/challans/domain/challan_item.dart';
 import 'package:saree_sutra/features/challans/presentation/controllers/challan_providers.dart';
+import 'package:saree_sutra/features/challans/presentation/widgets/edit_challan_dialog.dart';
 import 'package:saree_sutra/features/challans/presentation/widgets/fulfill_supplier_material_dialog.dart';
 import 'package:saree_sutra/core/utils/challan_pdf_generator.dart';
 import 'package:saree_sutra/features/suppliers/presentation/controllers/suppliers_providers.dart';
@@ -374,11 +377,21 @@ class ChallanDetailScreen extends ConsumerWidget {
     final theme = Theme.of(context);
     final dateStr =
         DateFormat('dd MMM yyyy, hh:mm a').format(liveChallan.createdAt);
+    final isAdmin =
+        ref.watch(authStateChangesProvider).value?.role == UserRole.admin;
+    final canEdit =
+        isAdmin && liveChallan.status != ChallanStatus.cancelled;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(liveChallan.challanNumber),
         actions: [
+          if (canEdit)
+            IconButton(
+              icon: const Icon(Icons.edit_outlined),
+              tooltip: 'Edit Challan',
+              onPressed: () => showEditChallanDialog(context, liveChallan),
+            ),
           IconButton(
             icon: const Icon(Icons.picture_as_pdf, color: Colors.redAccent),
             tooltip: 'Download / Share PDF',

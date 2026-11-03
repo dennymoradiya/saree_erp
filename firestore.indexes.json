@@ -1,6 +1,31 @@
 {
   "indexes": [
     {
+      "collectionGroup": "challans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "stitchingUserId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "challans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "challans",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "stitchingUserId", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "challan_items",
       "queryScope": "COLLECTION",
       "fields": [

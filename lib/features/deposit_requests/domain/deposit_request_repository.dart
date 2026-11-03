@@ -33,5 +33,6 @@ abstract interface class DepositRequestRepository {
     required String sku,
     required double returnQuantity,
     String? notes,
+    DateTime? occurredAt,
   });
 }

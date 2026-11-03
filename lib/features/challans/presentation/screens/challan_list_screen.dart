@@ -3,11 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:saree_sutra/core/enums/challan_status.dart';
+import 'package:saree_sutra/core/enums/user_role.dart';
 import 'package:saree_sutra/core/routing/route_paths.dart';
+import 'package:saree_sutra/features/auth/presentation/controllers/auth_providers.dart';
 import 'package:saree_sutra/core/widgets/async_state_widgets.dart';
 import 'package:saree_sutra/features/challans/domain/challan.dart';
 import 'package:saree_sutra/features/challans/presentation/controllers/challan_providers.dart';
 import 'package:saree_sutra/features/challans/presentation/screens/challan_detail_screen.dart';
+import 'package:saree_sutra/features/challans/presentation/widgets/edit_challan_dialog.dart';
 import 'package:saree_sutra/features/suppliers/presentation/controllers/suppliers_providers.dart';
 import 'package:saree_sutra/features/users/presentation/controllers/users_providers.dart';
 
@@ -34,6 +37,8 @@ class _ChallanListScreenState extends ConsumerState<ChallanListScreen> {
     final challansAsync = ref.watch(challansStreamProvider(filter));
     final suppliersAsync = ref.watch(suppliersListProvider);
     final stitchingUsersAsync = ref.watch(stitchingUsersListProvider);
+    final isAdmin =
+        ref.watch(authStateChangesProvider).value?.role == UserRole.admin;
 
     final suppliersMap = suppliersAsync.asData?.value.fold<Map<String, String>>(
           {},
@@ -41,11 +46,12 @@ class _ChallanListScreenState extends ConsumerState<ChallanListScreen> {
         ) ??
         {};
 
-    final stitchingUsersMap = stitchingUsersAsync.asData?.value.fold<Map<String, String>>(
+    final stitchingUsers = List.of(stitchingUsersAsync.asData?.value ?? [])
+      ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    final stitchingUsersMap = stitchingUsers.fold<Map<String, String>>(
           {},
           (map, u) => map..[u.stitchingUserId] = u.name,
-        ) ??
-        {};
+        );
 
     return Scaffold(
       appBar: AppBar(
@@ -87,6 +93,33 @@ class _ChallanListScreenState extends ConsumerState<ChallanListScreen> {
             ),
           ),
 
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: DropdownButtonFormField<String?>(
+              initialValue: _selectedStitchingUserId,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Stitching User',
+                prefixIcon: Icon(Icons.person_outline),
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              items: [
+                const DropdownMenuItem<String?>(
+                  value: null,
+                  child: Text('All Stitching Users'),
+                ),
+                ...stitchingUsers.map(
+                  (u) => DropdownMenuItem<String?>(
+                    value: u.stitchingUserId,
+                    child: Text(u.name),
+                  ),
+                ),
+              ],
+              onChanged: (id) => setState(() => _selectedStitchingUserId = id),
+            ),
+          ),
+
           // Search Bar
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -115,6 +148,9 @@ class _ChallanListScreenState extends ConsumerState<ChallanListScreen> {
                 }).toList();
 
                 if (challans.isEmpty) {
+                  final selectedUserName = _selectedStitchingUserId == null
+                      ? null
+                      : stitchingUsersMap[_selectedStitchingUserId!];
                   return Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
@@ -123,7 +159,12 @@ class _ChallanListScreenState extends ConsumerState<ChallanListScreen> {
                         const SizedBox(height: 12),
                         const Text('No Challans Found', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
-                        const Text('Create a new multi-item challan to start tracking production.'),
+                        Text(
+                          selectedUserName == null
+                              ? 'Create a new multi-item challan to start tracking production.'
+                              : 'No challans found for $selectedUserName.',
+                          textAlign: TextAlign.center,
+                        ),
                         const SizedBox(height: 16),
                         FilledButton.icon(
                           onPressed: () => context.push(RoutePaths.adminCreateChallan),
@@ -149,6 +190,8 @@ class _ChallanListScreenState extends ConsumerState<ChallanListScreen> {
                       challan: challan,
                       supplierName: supplierName,
                       stitchingUserName: stitchingUserName,
+                      canEdit: isAdmin &&
+                          challan.status != ChallanStatus.cancelled,
                     );
                   },
                 );
@@ -171,11 +214,13 @@ class _ChallanCard extends StatelessWidget {
     required this.challan,
     required this.supplierName,
     required this.stitchingUserName,
+    required this.canEdit,
   });
 
   final Challan challan;
   final String supplierName;
   final String stitchingUserName;
+  final bool canEdit;
 
   Color _statusColor(ChallanStatus status, ThemeData theme) {
     switch (status) {
@@ -216,14 +261,22 @@ class _ChallanCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    challan.challanNumber,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
+                  Expanded(
+                    child: Text(
+                      challan.challanNumber,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
+                  if (canEdit)
+                    IconButton(
+                      tooltip: 'Edit Challan',
+                      icon: const Icon(Icons.edit_outlined, size: 20),
+                      visualDensity: VisualDensity.compact,
+                      onPressed: () => showEditChallanDialog(context, challan),
+                    ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(

@@ -315,6 +315,7 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
     required String sku,
     required double returnQuantity,
     String? notes,
+    DateTime? occurredAt,
   }) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) {
@@ -337,6 +338,9 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
 
       await _firestore.runTransaction((tx) async {
         final now = FieldValue.serverTimestamp();
+        final transactionCreatedAt = occurredAt != null
+            ? Timestamp.fromDate(occurredAt)
+            : now;
 
         // 1. ALL READS FIRST
         for (final itemRef in returnOps.challanItemUpdates.keys) {
@@ -356,13 +360,14 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
           });
         }
 
-        // 3. Write material transactions
+        // 3. Write material transactions (ledger date = occurredAt for past records)
         for (final matTx in returnOps.materialTransactions) {
           final txRef = matTx['ref'] as DocumentReference<Map<String, dynamic>>;
           final data = matTx['data'] as Map<String, dynamic>;
           tx.set(txRef, {
             ...data,
-            'createdAt': now,
+            'createdAt': transactionCreatedAt,
+            if (notes != null && notes.trim().isNotEmpty) 'notes': notes.trim(),
           });
         }
 
@@ -390,6 +395,7 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
             'returnQuantity': returnQuantity,
             'resultingTransactionIds': returnOps.createdTxIds,
             'notes': notes?.trim(),
+            'occurredAt': transactionCreatedAt,
           },
           'createdAt': now,
         });
