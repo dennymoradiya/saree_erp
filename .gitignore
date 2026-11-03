@@ -14,7 +14,6 @@ build/
 *.iml
 
 # Firebase
-firebase_options.dart
 functions/lib/
 functions/node_modules/
 .firebase/
