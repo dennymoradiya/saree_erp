@@ -51,6 +51,7 @@ class CreateChallanInput {
     required this.items,
     this.notes,
     this.imageUrl,
+    this.createdAt,
     this.creatorRole = 'admin',
   });
 
@@ -59,5 +60,6 @@ class CreateChallanInput {
   final List<CreateChallanItemInput> items;
   final String? notes;
   final String? imageUrl;
+  final DateTime? createdAt;
   final String creatorRole;
 }

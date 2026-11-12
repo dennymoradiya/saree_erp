@@ -7,6 +7,7 @@ import 'package:saree_sutra/features/auth/presentation/controllers/auth_provider
 import 'package:saree_sutra/features/challans/presentation/screens/challan_detail_by_id_screen.dart';
 import 'package:saree_sutra/features/stitching_ledger/domain/stitching_ledger_models.dart';
 import 'package:saree_sutra/features/stitching_ledger/presentation/controllers/stitching_ledger_providers.dart';
+import 'package:saree_sutra/features/stitching_ledger/presentation/screens/production_breakdown_screen.dart';
 import 'package:saree_sutra/features/supplier_ledger/presentation/controllers/supplier_ledger_providers.dart';
 import 'package:saree_sutra/features/users/presentation/controllers/users_providers.dart';
 
@@ -258,6 +259,9 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
                   }
                 }
 
+                final quantityFormat = NumberFormat.decimalPattern()
+                  ..maximumFractionDigits = 8;
+
                 return ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
@@ -267,7 +271,7 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
                         Expanded(
                           child: _StitchingSummaryCard(
                             label: 'Finished Sarees Returned',
-                            value: overallReturned.toInt().toString(),
+                            value: quantityFormat.format(overallReturned),
                             color: Colors.green.shade800,
                             icon: Icons.checkroom,
                           ),
@@ -291,6 +295,44 @@ class _StitchingLedgerScreenState extends ConsumerState<StitchingLedgerScreen> {
                           ),
                         ),
                       ],
+                    ),
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          final range = filterState.dateRange(DateTime.now());
+                          final dateFormat = DateFormat('dd MMM yyyy');
+                          final start = range.start;
+                          final end = range.end;
+                          final period = start == null || end == null
+                              ? filterState.dateFilter.displayName
+                              : start == end
+                                  ? dateFormat.format(start)
+                                  : '${dateFormat.format(start)} – ${dateFormat.format(end)}';
+                          final unitId = filterState.stitchingUserId;
+                          final selectedUnit = stitchingUsers
+                              .where((u) => u.stitchingUserId == unitId)
+                              .firstOrNull;
+                          final unit = unitId == null
+                              ? 'All Stitching Units'
+                              : selectedUnit?.name ?? unitId;
+                          final totals = summarizeProductionReturns(
+                            dayWiseLedgers,
+                          );
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => ProductionBreakdownScreen(
+                                stitchingUnit: unit,
+                                period: period,
+                                totals: totals,
+                              ),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.summarize_outlined),
+                        label: const Text('View Production Breakdown'),
+                      ),
                     ),
                     const SizedBox(height: 16),
 

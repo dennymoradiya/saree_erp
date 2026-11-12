@@ -77,6 +77,51 @@ void main() {
   });
 
   group('Stitching Ledger day-wise returns and distribution', () {
+    test('totals return allocations across days by product and SKU', () {
+      DayWiseStitchingLedger day(int date, List<(String, String, double)> rows) {
+        final timestamp = DateTime(2026, 9, date);
+        return DayWiseStitchingLedger(
+          date: timestamp,
+          totalReturnedQuantity: rows.fold(0.0, (sum, row) => sum + row.$3),
+          totalEvents: rows.length,
+          distributions: [
+            for (final (index, (productId, sku, quantity)) in rows.indexed)
+              StitchingDistributionItem(
+                transactionId: 'tx-$date-$index',
+                challanId: 'challan-$date-$index',
+                challanNumber: 'CH-$date-$index',
+                stitchingUserId: 'unit-1',
+                stitchingUserName: 'Ramesh Master',
+                productId: productId,
+                productName: 'Silk Saree',
+                sku: sku,
+                quantity: quantity,
+                timestamp: timestamp,
+                depositRequestId: 'deposit-$date',
+              ),
+          ],
+        );
+      }
+
+      final totals = summarizeProductionReturns([
+        day(1, [('silk', 'GREEN', 450), ('silk', 'GREEN', 50)]),
+        day(30, [
+          ('silk', 'GREEN', 500),
+          ('silk', 'PINK', 500.5),
+          ('cotton', 'GREEN', 100),
+        ]),
+      ]);
+
+      expect(
+        {for (final row in totals) (row.productId, row.sku): row.quantity},
+        {
+          ('silk', 'GREEN'): 1000,
+          ('silk', 'PINK'): 500.5,
+          ('cotton', 'GREEN'): 100,
+        },
+      );
+    });
+
     test('computes day-wise return totals and unique challans correctly', () {
       final day = DateTime(2026, 9, 23);
 

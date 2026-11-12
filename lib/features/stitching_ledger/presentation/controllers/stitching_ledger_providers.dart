@@ -37,47 +37,24 @@ class StitchingLedgerFilterState {
     );
   }
 
-  bool matchesDate(DateTime dt) {
-    final now = DateTime.now();
-    final todayStart = DateTime(now.year, now.month, now.day);
-    final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59, 999);
-
-    switch (dateFilter) {
-      case LedgerDateFilter.allTime:
-        return true;
-      case LedgerDateFilter.today:
-        return dt.isAfter(
-                todayStart.subtract(const Duration(milliseconds: 1))) &&
-            dt.isBefore(todayEnd);
-      case LedgerDateFilter.yesterday:
-        final yStart = todayStart.subtract(const Duration(days: 1));
-        final yEnd =
-            DateTime(yStart.year, yStart.month, yStart.day, 23, 59, 59, 999);
-        return dt.isAfter(yStart.subtract(const Duration(milliseconds: 1))) &&
-            dt.isBefore(yEnd);
-      case LedgerDateFilter.last7Days:
-        final sevenDaysAgo = todayStart.subtract(const Duration(days: 6));
-        return dt.isAfter(
-                sevenDaysAgo.subtract(const Duration(milliseconds: 1))) &&
-            dt.isBefore(todayEnd);
-      case LedgerDateFilter.thisMonth:
-        final monthStart = DateTime(now.year, now.month, 1);
-        return dt.isAfter(
-                monthStart.subtract(const Duration(milliseconds: 1))) &&
-            dt.isBefore(todayEnd);
-      case LedgerDateFilter.custom:
-        if (customStartDate != null) {
-          final s = DateTime(customStartDate!.year, customStartDate!.month,
-              customStartDate!.day);
-          if (dt.isBefore(s)) return false;
-        }
-        if (customEndDate != null) {
-          final e = DateTime(customEndDate!.year, customEndDate!.month,
-              customEndDate!.day, 23, 59, 59, 999);
-          if (dt.isAfter(e)) return false;
-        }
-        return true;
-    }
+  /// Calendar days included in the filter, with both endpoints inclusive.
+  ({DateTime? start, DateTime? end}) dateRange(DateTime now) {
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    return switch (dateFilter) {
+      LedgerDateFilter.allTime => (start: null, end: null),
+      LedgerDateFilter.today => (start: today, end: today),
+      LedgerDateFilter.yesterday => (start: yesterday, end: yesterday),
+      LedgerDateFilter.last7Days => (
+          start: DateTime(now.year, now.month, now.day - 6),
+          end: today,
+        ),
+      LedgerDateFilter.thisMonth => (
+          start: DateTime(now.year, now.month),
+          end: today,
+        ),
+      LedgerDateFilter.custom => (start: customStartDate, end: customEndDate),
+    };
   }
 }
 
@@ -149,8 +126,18 @@ final dayWiseStitchingLedgerProvider =
   final productMap = {for (final p in products) p.productId: p.name};
 
   // 1. Filter by date
-  final filteredTxs =
-      transactions.where((tx) => filter.matchesDate(tx.createdAt)).toList();
+  final range = filter.dateRange(DateTime.now());
+  final start = range.start;
+  final end = range.end;
+  final startOfDay =
+      start == null ? null : DateTime(start.year, start.month, start.day);
+  final endExclusive =
+      end == null ? null : DateTime(end.year, end.month, end.day + 1);
+  final filteredTxs = transactions.where(
+    (tx) =>
+        (startOfDay == null || !tx.createdAt.isBefore(startOfDay)) &&
+        (endExclusive == null || tx.createdAt.isBefore(endExclusive)),
+  );
 
   // 2. Group by date
   final Map<DateTime, List<StitchingDistributionItem>> dayGroups = {};

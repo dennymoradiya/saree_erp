@@ -379,6 +379,10 @@ class FirebaseChallanRepository implements ChallanRepository {
       await _firestore.runTransaction((tx) async {
         final now = FieldValue.serverTimestamp();
         final nowDt = DateTime.now();
+        final selectedDate = input.createdAt;
+        final challanDate = selectedDate == null
+            ? now
+            : Timestamp.fromDate(selectedDate);
 
         // 1. ALL READS FIRST
         final counterRef = _firestore
@@ -442,8 +446,8 @@ class FirebaseChallanRepository implements ChallanRepository {
           'createdBy': currentUser.uid,
           'createdByRole': input.creatorRole,
           'status': ChallanStatus.issued.value,
-          'issuedAt': now,
-          'createdAt': now,
+          'issuedAt': challanDate,
+          'createdAt': challanDate,
           'updatedAt': now,
           'notes': input.notes?.trim(),
           if (input.imageUrl != null) 'imageUrl': input.imageUrl,
@@ -476,8 +480,8 @@ class FirebaseChallanRepository implements ChallanRepository {
           createdBy: currentUser.uid,
           createdByRole: input.creatorRole,
           status: ChallanStatus.issued,
-          issuedAt: nowDt,
-          createdAt: nowDt,
+          issuedAt: selectedDate ?? nowDt,
+          createdAt: selectedDate ?? nowDt,
           updatedAt: nowDt,
           notes: input.notes?.trim(),
           imageUrl: input.imageUrl,

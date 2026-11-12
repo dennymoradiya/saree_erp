@@ -32,6 +32,7 @@ class _CreateChallanScreenState extends ConsumerState<CreateChallanScreen> {
 
   String? _selectedSupplierId;
   String? _selectedStitchingUserId;
+  DateTime? _createdAt;
 
   final List<_ChallanItemDraft> _items = [_ChallanItemDraft()];
   bool _isSubmitting = false;
@@ -39,6 +40,39 @@ class _CreateChallanScreenState extends ConsumerState<CreateChallanScreen> {
 
   XFile? _selectedImage;
   Uint8List? _selectedImageBytes;
+
+  Future<void> _pickCreatedAt() async {
+    final now = DateTime.now();
+    final initial = _createdAt ?? now;
+    final date = await showDatePicker(
+      context: context,
+      initialDate: initial.isAfter(now) ? now : initial,
+      firstDate: DateTime(1),
+      lastDate: now,
+    );
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(initial),
+    );
+    if (time == null || !mounted) return;
+
+    final selected = DateTime(
+      date.year,
+      date.month,
+      date.day,
+      time.hour,
+      time.minute,
+    );
+    if (selected.isAfter(DateTime.now())) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Choose a date and time in the past.')),
+      );
+      return;
+    }
+    setState(() => _createdAt = selected);
+  }
 
   Future<void> _pickImage() async {
     final file = await ImageUploadHelper.pickImage(context);
@@ -177,6 +211,7 @@ class _CreateChallanScreenState extends ConsumerState<CreateChallanScreen> {
         notes:
             _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
         imageUrl: uploadedImageUrl,
+        createdAt: _createdAt,
         creatorRole: isSupplier ? 'supplier' : 'admin',
       ),
     );
@@ -248,7 +283,7 @@ class _CreateChallanScreenState extends ConsumerState<CreateChallanScreen> {
                 onPressed: () {
                   final message = WhatsAppShareHelper.formatChallanMessage(
                     challanNumber: challan.challanNumber,
-                    createdAt: DateTime.now(),
+                    createdAt: challan.createdAt,
                     supplierName: supplierName,
                     stitchingUserName: stitchingUserName,
                     notes: _notesCtrl.text.trim().isNotEmpty
@@ -299,6 +334,12 @@ class _CreateChallanScreenState extends ConsumerState<CreateChallanScreen> {
     final stitchingUsersAsync = ref.watch(stitchingUsersListProvider);
     final productsAsync = ref.watch(productsStreamProvider);
     final theme = Theme.of(context);
+    final localizations = MaterialLocalizations.of(context);
+    final createdAt = _createdAt;
+    final createdAtLabel = createdAt == null
+        ? 'Use current date and time'
+        : '${localizations.formatShortDate(createdAt)}, '
+              '${TimeOfDay.fromDateTime(createdAt).format(context)}';
 
     return Scaffold(
       appBar: AppBar(
@@ -485,6 +526,35 @@ class _CreateChallanScreenState extends ConsumerState<CreateChallanScreen> {
                                           : null,
                                     ),
                                   ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: OutlinedButton.icon(
+                                      onPressed:
+                                          _isSubmitting ? null : _pickCreatedAt,
+                                      icon: const Icon(Icons.calendar_today),
+                                      label: Text(
+                                        'Challan date and time\n$createdAtLabel',
+                                        textAlign: TextAlign.start,
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        alignment: Alignment.centerLeft,
+                                        padding: const EdgeInsets.all(12),
+                                      ),
+                                    ),
+                                  ),
+                                  if (createdAt != null)
+                                    IconButton(
+                                      tooltip: 'Use current date and time',
+                                      onPressed: _isSubmitting
+                                          ? null
+                                          : () =>
+                                                setState(() => _createdAt = null),
+                                      icon: const Icon(Icons.restart_alt),
+                                    ),
                                 ],
                               ),
                               const SizedBox(height: 12),

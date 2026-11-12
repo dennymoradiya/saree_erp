@@ -52,3 +52,36 @@ class DayWiseStitchingLedger {
   int get uniqueStitchingUsersCount =>
       distributions.map((d) => d.stitchingUserId).toSet().length;
 }
+
+typedef ProductionReturnTotal = ({
+  String productId,
+  String productName,
+  String sku,
+  double quantity,
+});
+
+/// Totals the return allocations by product variant across the filtered days.
+List<ProductionReturnTotal> summarizeProductionReturns(
+  Iterable<DayWiseStitchingLedger> days,
+) {
+  final totals = <(String, String), ProductionReturnTotal>{};
+  for (final day in days) {
+    for (final item in day.distributions) {
+      final key = (item.productId, item.sku);
+      totals[key] = (
+        productId: item.productId,
+        productName: item.productName,
+        sku: item.sku,
+        quantity: (totals[key]?.quantity ?? 0) + item.quantity,
+      );
+    }
+  }
+
+  return totals.values.toList()
+    ..sort((a, b) {
+      final nameOrder = a.productName.compareTo(b.productName);
+      if (nameOrder != 0) return nameOrder;
+      final skuOrder = a.sku.compareTo(b.sku);
+      return skuOrder == 0 ? a.productId.compareTo(b.productId) : skuOrder;
+    });
+}
