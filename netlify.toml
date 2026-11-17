@@ -3,7 +3,7 @@
   command = "bash netlify_build.sh"
 
 [build.environment]
-  FLUTTER_BRANCH = "stable"
+  FLUTTER_VERSION = "3.47.5"
 
 # Single Page App (SPA) redirect for GoRouter navigation
 [[redirects]]
