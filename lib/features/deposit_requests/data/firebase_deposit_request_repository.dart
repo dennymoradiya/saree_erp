@@ -316,6 +316,27 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
     required double returnQuantity,
     String? notes,
     DateTime? occurredAt,
+  }) {
+    return recordManualAdminReturns(
+      stitchingUserId: stitchingUserId,
+      items: [
+        DepositRequestItem(
+          productId: productId,
+          sku: sku,
+          requestedQuantity: returnQuantity,
+        ),
+      ],
+      notes: notes,
+      occurredAt: occurredAt,
+    );
+  }
+
+  @override
+  Future<Result<List<String>>> recordManualAdminReturns({
+    required String stitchingUserId,
+    required List<DepositRequestItem> items,
+    String? notes,
+    DateTime? occurredAt,
   }) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) {
@@ -323,15 +344,33 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
     }
 
     try {
+      if (items.isEmpty) {
+        throw const LedgerViolationException('Add at least one return item.');
+      }
+      final quantities = <(String, String), double>{};
+      for (final item in items) {
+        if (item.productId.isEmpty ||
+            item.sku.isEmpty ||
+            !item.requestedQuantity.isFinite ||
+            item.requestedQuantity <= 0) {
+          throw const LedgerViolationException(
+            'Each return item requires a product, SKU and positive quantity.',
+          );
+        }
+        final key = (item.productId, item.sku);
+        quantities[key] = (quantities[key] ?? 0) + item.requestedQuantity;
+      }
+      final demands = [
+        for (final entry in quantities.entries)
+          _ReturnDemand(
+            productId: entry.key.$1,
+            sku: entry.key.$2,
+            quantity: entry.value,
+          ),
+      ];
       final returnOps = await _prepareStitchingReturnOperations(
         stitchingUserId: stitchingUserId,
-        returnDemands: [
-          _ReturnDemand(
-            productId: productId,
-            sku: sku,
-            quantity: returnQuantity,
-          ),
-        ],
+        returnDemands: demands,
         createdBy: currentUser.uid,
         depositRequestId: null,
       );
@@ -390,9 +429,19 @@ class FirebaseDepositRequestRepository implements DepositRequestRepository {
           'entityId': stitchingUserId,
           'beforeData': null,
           'afterData': {
-            'productId': productId,
-            'sku': sku,
-            'returnQuantity': returnQuantity,
+            if (demands.length == 1) ...{
+              'productId': demands.single.productId,
+              'sku': demands.single.sku,
+              'returnQuantity': demands.single.quantity,
+            },
+            'items': [
+              for (final demand in demands)
+                {
+                  'productId': demand.productId,
+                  'sku': demand.sku,
+                  'returnQuantity': demand.quantity,
+                },
+            ],
             'resultingTransactionIds': returnOps.createdTxIds,
             'notes': notes?.trim(),
             'occurredAt': transactionCreatedAt,

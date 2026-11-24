@@ -35,4 +35,11 @@ abstract interface class DepositRequestRepository {
     String? notes,
     DateTime? occurredAt,
   });
+
+  Future<Result<List<String>>> recordManualAdminReturns({
+    required String stitchingUserId,
+    required List<DepositRequestItem> items,
+    String? notes,
+    DateTime? occurredAt,
+  });
 }

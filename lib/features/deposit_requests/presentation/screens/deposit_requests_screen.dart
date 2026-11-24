@@ -416,12 +416,10 @@ class ManualReturnDialog extends ConsumerStatefulWidget {
 
 class _ManualReturnDialogState extends ConsumerState<ManualReturnDialog> {
   final _formKey = GlobalKey<FormState>();
-  final _qtyCtrl = TextEditingController();
+  final _items = [_ManualReturnItemDraft()];
   final _notesCtrl = TextEditingController();
 
   StitchingUserProfile? _selectedUser;
-  Product? _selectedProduct;
-  ProductSku? _selectedSku;
   DateTime _occurredAt = DateTime.now();
 
   bool _isLoading = false;
@@ -429,25 +427,29 @@ class _ManualReturnDialogState extends ConsumerState<ManualReturnDialog> {
 
   @override
   void dispose() {
-    _qtyCtrl.dispose();
+    for (final item in _items) {
+      item.quantityController.dispose();
+    }
     _notesCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedUser == null ||
-        _selectedProduct == null ||
-        _selectedSku == null) {
-      setState(() => _error = 'All fields are required.');
+    final selectedUser = _selectedUser;
+    if (selectedUser == null ||
+        _items.any((item) => item.product == null || item.sku == null)) {
+      setState(() => _error = 'Select a user, product and SKU for each item.');
       return;
     }
-
-    final qty = double.tryParse(_qtyCtrl.text.trim()) ?? 0;
-    if (qty <= 0) {
-      setState(() => _error = 'Positive return quantity required.');
-      return;
-    }
+    final items = [
+      for (final item in _items)
+        DepositRequestItem(
+          productId: item.product!.productId,
+          sku: item.sku!.sku,
+          requestedQuantity: double.parse(item.quantityController.text.trim()),
+        ),
+    ];
 
     setState(() {
       _isLoading = true;
@@ -456,52 +458,45 @@ class _ManualReturnDialogState extends ConsumerState<ManualReturnDialog> {
 
     final repo = ref.read(depositRequestRepositoryProvider);
 
-    // SPEC §18 / §52: Check for same-day pending request
-    final dupCheck = await repo.hasSameDayPendingDepositRequest(
-      stitchingUserId: _selectedUser!.stitchingUserId,
-      productId: _selectedProduct!.productId,
-      sku: _selectedSku!.sku,
-    );
-
-    final hasDup = dupCheck.when(success: (v) => v, failure: (_) => false);
-    if (hasDup) {
-      setState(() => _isLoading = false);
-      if (!mounted) return;
-      await showDialog(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Row(
-            children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
-              SizedBox(width: 8),
-              Expanded(child: Text('Duplicate Request Warning')),
-            ],
-          ),
-          content: Text(
-            'An unverified deposit request already exists for ${_selectedUser!.name} '
-            'for ${_selectedProduct!.name} / ${_selectedSku!.sku} submitted today.\n\n'
-            'Please review and verify the user\'s pending deposit request before recording a manual return to prevent double-counting.',
-          ),
-          actions: [
-            FilledButton(
-              onPressed: () {
-                Navigator.of(ctx).pop();
-                Navigator.of(context).pop();
-              },
-              child: const Text('Go to Pending Requests'),
-            ),
-          ],
-        ),
+    final checkedVariants = <(String, String)>{};
+    for (var i = 0; i < items.length; i++) {
+      final item = items[i];
+      if (!checkedVariants.add((item.productId, item.sku))) continue;
+      final dupCheck = await repo.hasSameDayPendingDepositRequest(
+        stitchingUserId: selectedUser.stitchingUserId,
+        productId: item.productId,
+        sku: item.sku,
       );
-      return;
+      if (!mounted) return;
+
+      if (!dupCheck.isSuccess) {
+        setState(() {
+          _isLoading = false;
+          _error = dupCheck.when(
+            success: (_) => null,
+            failure: (err) => err.message,
+          );
+        });
+        return;
+      }
+      final hasDuplicate = dupCheck.when(
+        success: (value) => value,
+        failure: (_) => false,
+      );
+      if (hasDuplicate) {
+        setState(() {
+          _isLoading = false;
+          _error = 'An unverified deposit request already exists today for '
+              '${_items[i].product!.name} / ${item.sku}. '
+              'Review the pending request before recording this return.';
+        });
+        return;
+      }
     }
 
-    // No duplicate found: Proceed with manual return
-    final result = await repo.recordManualAdminReturn(
-      stitchingUserId: _selectedUser!.stitchingUserId,
-      productId: _selectedProduct!.productId,
-      sku: _selectedSku!.sku,
-      returnQuantity: qty,
+    final result = await repo.recordManualAdminReturns(
+      stitchingUserId: selectedUser.stitchingUserId,
+      items: items,
       notes: _notesCtrl.text.trim().isNotEmpty ? _notesCtrl.text.trim() : null,
       occurredAt: _occurredAt,
     );
@@ -558,153 +553,251 @@ class _ManualReturnDialogState extends ConsumerState<ManualReturnDialog> {
     final usersAsync = ref.watch(stitchingUsersListProvider);
     final productsAsync = ref.watch(productsStreamProvider);
 
-    return AlertDialog(
-      title: const Text('Record Direct Manual Return'),
-      content: SizedBox(
-        width: 480,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (_error != null)
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    margin: const EdgeInsets.only(bottom: 12),
-                    color: Colors.red.shade50,
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Colors.red),
+    return PopScope(
+      canPop: !_isLoading,
+      child: AlertDialog(
+        title: const Text('Record Direct Manual Return'),
+        content: SizedBox(
+          width: 560,
+          child: SingleChildScrollView(
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_error != null)
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      color: Colors.red.shade50,
+                      child: Text(
+                        _error!,
+                        style: const TextStyle(color: Colors.red),
+                      ),
                     ),
-                  ),
-                usersAsync.when(
-                  loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => Text('Error: $e'),
-                  data: (users) {
-                    final activeUsers = users.where((u) => u.isActive).toList();
-                    return DropdownButtonFormField<StitchingUserProfile>(
-                      initialValue: _selectedUser,
-                      decoration:
-                          const InputDecoration(labelText: 'Stitching User *'),
-                      items: activeUsers.map((u) {
-                        return DropdownMenuItem(value: u, child: Text(u.name));
-                      }).toList(),
-                      onChanged: (u) => setState(() => _selectedUser = u),
-                      validator: (v) => v == null ? 'User is required' : null,
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                productsAsync.when(
-                  loading: () => const LinearProgressIndicator(),
-                  error: (e, _) => Text('Error: $e'),
-                  data: (products) {
-                    final activeProducts =
-                        products.where((p) => p.isActive).toList();
-                    return DropdownButtonFormField<Product>(
-                      initialValue: _selectedProduct,
-                      decoration: const InputDecoration(labelText: 'Product *'),
-                      items: activeProducts.map((p) {
-                        return DropdownMenuItem(
-                          value: p,
-                          child: Text('${p.name} (${p.productCode})'),
-                        );
-                      }).toList(),
-                      onChanged: (p) => setState(() {
-                        _selectedProduct = p;
-                        _selectedSku = null;
-                      }),
-                      validator: (v) =>
-                          v == null ? 'Product is required' : null,
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                if (_selectedProduct != null)
-                  Consumer(
-                    builder: (context, ref, _) {
-                      final skusAsync = ref.watch(
-                        productSkusStreamProvider(_selectedProduct!.productId),
-                      );
-                      return skusAsync.when(
-                        loading: () => const LinearProgressIndicator(),
-                        error: (e, _) => Text('Error: $e'),
-                        data: (skus) {
-                          final activeSkus =
-                              skus.where((s) => s.isActive).toList();
-                          return DropdownButtonFormField<ProductSku>(
-                            initialValue: _selectedSku,
-                            decoration:
-                                const InputDecoration(labelText: 'Color SKU *'),
-                            items: activeSkus.map((sku) {
-                              return DropdownMenuItem(
-                                value: sku,
-                                child: Text('${sku.colorName} (${sku.sku})'),
-                              );
-                            }).toList(),
-                            onChanged: (sku) =>
-                                setState(() => _selectedSku = sku),
-                            validator: (v) =>
-                                v == null ? 'SKU is required' : null,
+                  usersAsync.when(
+                    loading: () => const LinearProgressIndicator(),
+                    error: (e, _) => Text('Error: $e'),
+                    data: (users) {
+                      final activeUsers =
+                          users.where((u) => u.isActive).toList();
+                      return DropdownButtonFormField<StitchingUserProfile>(
+                        initialValue: _selectedUser,
+                        decoration: const InputDecoration(
+                          labelText: 'Stitching User *',
+                        ),
+                        items: activeUsers.map((u) {
+                          return DropdownMenuItem(
+                            value: u,
+                            child: Text(u.name),
                           );
-                        },
+                        }).toList(),
+                        onChanged: _isLoading
+                            ? null
+                            : (u) => setState(() => _selectedUser = u),
+                        validator: (v) => v == null ? 'User is required' : null,
                       );
                     },
                   ),
-                const SizedBox(height: 12),
-                InkWell(
-                  onTap: _isLoading ? null : _pickOccurredAt,
-                  child: InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Return Date & Time *',
-                      suffixIcon: Icon(Icons.calendar_month),
-                    ),
-                    child: Text(
-                      DateFormat('dd MMM yyyy, hh:mm a').format(_occurredAt),
+                  const SizedBox(height: 12),
+                  ..._items.map(
+                    (item) => Padding(
+                      key: ObjectKey(item),
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (_items.length > 1)
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: IconButton(
+                                    tooltip: 'Remove item',
+                                    onPressed: _isLoading
+                                        ? null
+                                        : () {
+                                            setState(
+                                              () => _items.remove(item),
+                                            );
+                                            item.quantityController.dispose();
+                                          },
+                                    icon: const Icon(Icons.close),
+                                  ),
+                                ),
+                              productsAsync.when(
+                                loading: () => const LinearProgressIndicator(),
+                                error: (error, _) => Text('Error: $error'),
+                                data: (products) =>
+                                    DropdownButtonFormField<Product>(
+                                  initialValue: item.product,
+                                  isExpanded: true,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Product *',
+                                  ),
+                                  items: products
+                                      .where((p) => p.isActive)
+                                      .map((p) {
+                                    return DropdownMenuItem(
+                                      value: p,
+                                      child: Text(
+                                        '${p.name} (${p.productCode})',
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    );
+                                  }).toList(),
+                                  onChanged: _isLoading
+                                      ? null
+                                      : (product) {
+                                          setState(() {
+                                            item.product = product;
+                                            item.sku = null;
+                                          });
+                                        },
+                                  validator: (value) => value == null
+                                      ? 'Product is required'
+                                      : null,
+                                ),
+                              ),
+                              if (item.product != null) ...[
+                                const SizedBox(height: 12),
+                                Consumer(
+                                  builder: (context, ref, _) {
+                                    final skus = ref.watch(
+                                      productSkusStreamProvider(
+                                        item.product!.productId,
+                                      ),
+                                    );
+                                    return skus.when(
+                                      loading: () =>
+                                          const LinearProgressIndicator(),
+                                      error: (error, _) =>
+                                          Text('Error: $error'),
+                                      data: (values) =>
+                                          DropdownButtonFormField<ProductSku>(
+                                        key: ValueKey(
+                                          item.product!.productId,
+                                        ),
+                                        initialValue: item.sku,
+                                        isExpanded: true,
+                                        decoration: const InputDecoration(
+                                          labelText: 'Color SKU *',
+                                        ),
+                                        items: values
+                                            .where((sku) => sku.isActive)
+                                            .map((sku) {
+                                          return DropdownMenuItem(
+                                            value: sku,
+                                            child: Text(
+                                              '${sku.colorName} (${sku.sku})',
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          );
+                                        }).toList(),
+                                        onChanged: _isLoading
+                                            ? null
+                                            : (sku) {
+                                                setState(
+                                                  () => item.sku = sku,
+                                                );
+                                              },
+                                        validator: (value) => value == null
+                                            ? 'SKU is required'
+                                            : null,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
+                              const SizedBox(height: 12),
+                              TextFormField(
+                                controller: item.quantityController,
+                                enabled: !_isLoading,
+                                keyboardType:
+                                    const TextInputType.numberWithOptions(
+                                  decimal: true,
+                                ),
+                                decoration: const InputDecoration(
+                                  labelText: 'Finished Sarees Returned *',
+                                  hintText: 'e.g. 50',
+                                ),
+                                validator: (value) {
+                                  final quantity =
+                                      double.tryParse(value?.trim() ?? '');
+                                  return quantity == null ||
+                                          !quantity.isFinite ||
+                                          quantity <= 0
+                                      ? 'Valid positive quantity required'
+                                      : null;
+                                },
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _qtyCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Finished Sarees Returned *',
-                    hintText: 'e.g. 50',
+                  OutlinedButton.icon(
+                    onPressed: _isLoading
+                        ? null
+                        : () {
+                            setState(
+                              () => _items.add(_ManualReturnItemDraft()),
+                            );
+                          },
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add Item'),
                   ),
-                  validator: (v) => (double.tryParse(v ?? '') ?? 0) <= 0
-                      ? 'Valid positive quantity required'
-                      : null,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _notesCtrl,
-                  decoration:
-                      const InputDecoration(labelText: 'Notes (Optional)'),
-                ),
-              ],
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: _isLoading ? null : _pickOccurredAt,
+                    child: InputDecorator(
+                      decoration: const InputDecoration(
+                        labelText: 'Return Date & Time *',
+                        suffixIcon: Icon(Icons.calendar_month),
+                      ),
+                      child: Text(
+                        DateFormat('dd MMM yyyy, hh:mm a').format(_occurredAt),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _notesCtrl,
+                    enabled: !_isLoading,
+                    decoration:
+                        const InputDecoration(labelText: 'Notes (Optional)'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
+        actions: [
+          TextButton(
+            onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _isLoading ? null : _submit,
+            child: _isLoading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Record Return'),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: _isLoading ? null : () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: _isLoading ? null : _submit,
-          child: _isLoading
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Text('Record Return'),
-        ),
-      ],
     );
   }
+}
+
+class _ManualReturnItemDraft {
+  final quantityController = TextEditingController();
+  Product? product;
+  ProductSku? sku;
 }
